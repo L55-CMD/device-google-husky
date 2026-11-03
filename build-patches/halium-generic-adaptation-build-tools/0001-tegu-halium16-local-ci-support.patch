@@ -1,10 +1,23 @@
+From b288c683529267ffdc488795ebf35664384256b7 Mon Sep 17 00:00:00 2001
+From: Luke <luke@localhost>
+Date: Tue, 3 Nov 2026 12:16:13 +0000
+Subject: [PATCH] halium16: local GSI + libhybris overlay
+
+---
+ prepare-fake-ota.sh | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
 diff --git a/prepare-fake-ota.sh b/prepare-fake-ota.sh
-index 215dcbb..db6c310 100755
+index 89f3af2..2880a80 100644
 --- a/prepare-fake-ota.sh
 +++ b/prepare-fake-ota.sh
-@@ -72,6 +72,11 @@ case "$deviceinfo_halium_version" in
+@@ -80,9 +80,14 @@ case "$deviceinfo_halium_version" in
      14)
          DEVICE_GENERIC_URL="$DEVICE_GENERIC_URL_BASE/halium-14.0/lastSuccessfulBuild/artifact/halium_halium_arm64.tar.xz"
+         ;;
+-    15|16)
++    15)
+         DEVICE_GENERIC_URL="$DEVICE_GENERIC_URL_BASE/halium-16.0/lastSuccessfulBuild/artifact/halium_halium_arm64.tar.xz"
          ;;
 +    16)
 +        # Local halium-16 GSI built from halium-build tree
@@ -14,7 +27,7 @@ index 215dcbb..db6c310 100755
      *)
          print_error "Unsupported halium version: '$deviceinfo_halium_version'"
          exit 1
-@@ -151,10 +156,22 @@ file="rootfs.tar.xz"
+@@ -162,10 +167,22 @@ file="rootfs.tar.xz"
  touch "$OUTPUT/$file.asc"
  echo "update $file $file.asc" >> "$OUTPUT/ubuntu_command"
  
@@ -37,18 +50,6 @@ index 215dcbb..db6c310 100755
  else
      download_file "$DEVICE_GENERIC_URL" "$OUTPUT"
  fi
-diff --git a/setup_repositories.sh b/setup_repositories.sh
-index 58bfeb0..3515449 100644
---- a/setup_repositories.sh
-+++ b/setup_repositories.sh
-@@ -121,6 +121,10 @@ setup_clang() {
-                 CLANG_BRANCH="main-kernel-build-2023"
-                 CLANG_REVISION="r487747c"
-                 ;;
-+            16)
-+                CLANG_BRANCH="main-kernel-build-2023"
-+                CLANG_REVISION="r487747c"
-+                ;;
- 
-             *)
-                 print_error "Clang is not supported with halium version '$deviceinfo_halium_version'"
+-- 
+2.54.0.windows.1
+
