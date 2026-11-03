@@ -12,7 +12,7 @@ output_dir="$(realpath -m "$2")"
 work_dir="${3:-${repo_root}/workdir/device-tarball}"
 work_dir="$(realpath -m "${work_dir}")"
 
-archive="${work_dir}/kernel-tegu.zip"
+archive="${work_dir}/kernel-husky.zip"
 kernel_dir="${work_dir}/kernel-extracted"
 kernel_obj_dir="${work_dir}/KERNEL_OBJ"
 port_tree="${work_dir}/port-tree"
@@ -99,7 +99,7 @@ cp -f "${kernel_image}" "${kernel_obj_dir}/arch/arm64/boot/${deviceinfo_kernel_i
 
 (
     cd "${port_tree}"
-    "${repo_root}/build/build-tarball-mainline.sh" tegu "${output_dir}" "${staging_dir}" usrmerge
+    "${repo_root}/build/build-tarball-mainline.sh" husky "${output_dir}" "${staging_dir}" usrmerge
 )
-ln -sf device_tegu.tar.xz "${output_dir}/device_tegu_usrmerge.tar.xz"
-ln -sf device_tegu.tar.build "${output_dir}/device_tegu_usrmerge.tar.build"
+ln -sf device_husky.tar.xz "${output_dir}/device_husky_usrmerge.tar.xz"
+ln -sf device_husky.tar.build "${output_dir}/device_husky_usrmerge.tar.build"

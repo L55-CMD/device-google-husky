@@ -5,7 +5,7 @@ if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
     cat >&2 <<USAGE
 usage: $0 <lineage-zip-url> <halium-artifacts-dir> <output-super-img> [work-dir]
 
-Assembles a flashable super.img for tegu (Pixel 9a) by:
+Assembles a flashable super.img for husky (Pixel 8 Pro) by:
   1. Downloading the LineageOS zip, extracting payload.bin
   2. Running vm03/payload_dumper (via docker) to extract vendor/system_ext/product
   3. Combining those with the Halium-built system/system_dlkm/vendor_dlkm using lpmake
@@ -24,7 +24,7 @@ output_super_img="$(realpath -m "$3")"
 work_dir="${4:-$(pwd)/workdir/super}"
 work_dir="$(realpath -m "${work_dir}")"
 
-# tegu super layout (from lpdump of stock super_empty.img):
+# husky super layout (from lpdump of stock super_empty.img; identical to tegu/zuma family):
 SUPER_SIZE=8531214336
 GROUP_SIZE=8527020032
 METADATA_SIZE=65536

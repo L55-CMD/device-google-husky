@@ -1,24 +1,25 @@
-deviceinfo_name="Google Pixel 9a"
+deviceinfo_name="Google Pixel 8 Pro"
 deviceinfo_manufacturer="Google"
-deviceinfo_codename="tegu"
+deviceinfo_codename="husky"
 deviceinfo_arch="aarch64"
 
 # Kernel - using Halium-patched android14-6.1 GKI kernel
 deviceinfo_kernel_source="https://gitlab.com/ubports/porting/community-ports/android12/generic/kernel-android-common.git"
 deviceinfo_kernel_source_branch="android14-6.1-halium"
+# (kernel is actually built by lineage-kernel-manifest-husky CI, see README)
 deviceinfo_kernel_defconfig="gki_defconfig halium.config"
 deviceinfo_kernel_clang_compile="true"
 deviceinfo_kernel_llvm_compile="true"
 deviceinfo_kernel_image_name="Image.lz4"
 
 # Kernel cmdline
-# Stock LineageOS: earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 ...
+# Stock zuma (LineageOS husky): earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 ...
 # Added: console=tty0 (required for Ubuntu Touch rootfs), systempart=/dev/mapper/system
 deviceinfo_kernel_cmdline="lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,apparmor,selinux console=tty0 earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 printk.devkmsg=on cgroup.memory=nokmem rcupdate.rcu_expedited=1 rcu_nocbs=all rcutree.enable_rcu_lazy swiotlb=noforce disable_dma32=on at24.write_timeout=100 log_buf_len=1024K bootconfig systempart=/dev/mapper/system kvm-arm.mode=nvhe exynos_drm.dp_rate=2"
 
 # Boot image - extracted from LineageOS vendor_kernel_boot.img
 deviceinfo_ramdisk_compression="lz4"
-deviceinfo_bootimg_prebuilt_dtb="google-tegu.dtb"
+deviceinfo_bootimg_prebuilt_dtb="google-husky.dtb"
 deviceinfo_flash_pagesize="2048"
 deviceinfo_flash_offset_base="0x0"
 deviceinfo_flash_offset_kernel="0x10008000"
@@ -29,7 +30,7 @@ deviceinfo_bootimg_qcdt="false"
 deviceinfo_bootimg_header_version="4"
 deviceinfo_bootimg_partition_size="$((64*$((2**20))))"
 deviceinfo_bootimg_os_version="16"
-deviceinfo_bootimg_os_patch_level="2026-03"
+deviceinfo_bootimg_os_patch_level="2026-09"
 deviceinfo_bootimg_has_init_boot_partition="true"
 
 # Bootconfig

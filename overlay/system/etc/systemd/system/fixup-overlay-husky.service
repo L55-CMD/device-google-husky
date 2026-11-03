@@ -1,5 +1,5 @@
 [Unit]
-Description=Halium 16 tegu: overlayfs + halium-overlay + fixups
+Description=Halium 16 husky: overlayfs + halium-overlay + fixups
 DefaultDependencies=no
 Requires=mount-android-system.service mount-android-partitions.service
 After=mount-android-system.service mount-android-partitions.service

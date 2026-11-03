@@ -1,10 +1,11 @@
-tegu:
-  Name: tegu
-  PrettyName: "Google Pixel 9a"
+husky:
+  Name: husky
+  PrettyName: "Google Pixel 8 Pro"
   Vendor: Google
   DeviceType: phone
-  GridUnit: 23
-  WebkitDpr: 2.5
+  # 6.7" 1344x2992 (~489 ppi); adjust after first boot if shell scaling is off
+  GridUnit: 26
+  WebkitDpr: 2.75
   SupportedOrientations:
     - Portrait
     - InvertedPortrait

@@ -1,5 +1,5 @@
 [Unit]
-Description=USB DisplayPort gbinder client (tegu)
+Description=USB DisplayPort gbinder client (husky)
 After=lxc-android-config.service
 Requires=lxc-android-config.service
 

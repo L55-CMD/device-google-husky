@@ -73,7 +73,7 @@ curl -L --fail --output "${ota_input_dir}/libhybris-16-update.tar.xz" "${libhybr
     "${output_dir}" \
     "${kernel_work_dir}"
 
-"${build_dir}/prepare-fake-ota.sh" "${output_dir}/device_tegu_usrmerge.tar.xz" "${ota_dir}"
+"${build_dir}/prepare-fake-ota.sh" "${output_dir}/device_husky_usrmerge.tar.xz" "${ota_dir}"
 sudo env PATH="${PATH}" "${build_dir}/system-image-from-ota.sh" "${ota_dir}/ubuntu_command" "${output_dir}"
 
 kernel_extract_dir="${kernel_work_dir}/kernel-extracted"
@@ -97,8 +97,8 @@ for file in \
     "${output_dir}/dtbo.img" \
     "${output_dir}/system_dlkm.img" \
     "${output_dir}/vendor_dlkm.flatten.img" \
-    "${output_dir}/device_tegu.tar.xz" \
-    "${output_dir}/device_tegu.tar.build" \
+    "${output_dir}/device_husky.tar.xz" \
+    "${output_dir}/device_husky.tar.build" \
     "${ota_input_dir}/libhybris-16-update.tar.xz" \
     "${ota_input_dir}/halium_halium_arm64-16.tar.xz" \
     "${ota_dir}/ubuntu_command"; do

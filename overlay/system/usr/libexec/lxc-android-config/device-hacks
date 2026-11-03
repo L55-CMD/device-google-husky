@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# device-hacks for Pixel 9a (tegu) - Halium 16 / Android 16
+# device-hacks for Pixel 8 Pro (husky) - Halium 16 / Android 16
+# (inherited from tegu port - verify sysfs paths on zuma during bring-up)
 
 # Android 16 ashmem requires /dev/ashmem<boot_id> but kernel only creates /dev/ashmem
 # Create symlink on host and in Android container

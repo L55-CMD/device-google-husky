@@ -1,6 +1,6 @@
 #!/bin/sh -eu
 
-# Halium 16 (tegu): Make /android/system writable via overlayfs,
+# Halium 16 (husky): Make /android/system writable via overlayfs,
 # copy halium-overlay files, and remove problematic APEXes.
 # This replaces mount-halium-overlay's bind-mount approach which
 # conflicts with overlayfs, and enables pre-start hooks to work

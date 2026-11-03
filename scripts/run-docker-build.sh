@@ -2,7 +2,7 @@
 set -euo pipefail
 
 workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-image_tag="${IMAGE_TAG:-tegu-final-builder:local}"
+image_tag="${IMAGE_TAG:-husky-final-builder:local}"
 skip_docker_build="${SKIP_DOCKER_BUILD:-0}"
 
 if [ "${skip_docker_build}" != "1" ]; then
