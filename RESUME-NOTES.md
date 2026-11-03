@@ -8,10 +8,10 @@ replaced by release assets of a <owner>/husky-packages repo (per-branch release
 tags + "main" fallback, which matches assemble-final-image.sh's resolver).
 
 ## Pushed to GitHub (2026-11-03) - repos live
-- https://github.com/Luk3-ss/device-google-husky (main)
-- https://github.com/Luk3-ss/lineage-kernel-manifest-husky (main)
-- https://github.com/Luk3-ss/kernel-patches-husky (halium-husky)
-- https://github.com/Luk3-ss/husky-packages: release tag "main" with
+- https://github.com/l55-cmd/device-google-husky (main)
+- https://github.com/l55-cmd/lineage-kernel-manifest-husky (main)
+- https://github.com/l55-cmd/kernel-patches-husky (halium-husky)
+- https://github.com/l55-cmd/husky-packages: release tag "main" with
   system.img.zip + libhybris-16-update.tar.xz (mirrored from deusch public
   registry) + lineage-23.2-20261009 zip (sha256-verified local copy kept at
   ~/husky-verify). kernel.zip is published by kernel CI into the kernel repo's
@@ -19,7 +19,7 @@ tags + "main" fallback, which matches assemble-final-image.sh's resolver).
 
 ## BLOCKER: GitHub account locked (billing)
 First kernel CI run failed instantly: "your account is locked due to a
-billing issue". Actions will not run until Luk3-ss fixes it at
+billing issue". Actions will not run until l55-cmd fixes it at
 https://github.com/settings/billing (usually an expired card on file or an
 old unpaid invoice; updating/removing the payment method unlocks it).
 After it is fixed: re-run the failed workflow (Actions -> build-kernel ->
