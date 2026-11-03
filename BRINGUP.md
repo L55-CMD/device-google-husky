@@ -83,9 +83,12 @@ sha256: 7b3cd1db0b76d043f4270a23c89e382894c955d77e2cc23b6f10986f7d2167a2
 ## 6. Flashing and bring-up
 
 Prerequisites: bootloader unlocked, stock **Android 16** flashed on both slots first
-(vendor blobs + firmware come from stock). Then from the release `images.zip`:
+(vendor blobs + firmware come from stock). Then download `boot-images.zip` and all
+`super.img.part-*` from the rolling release and, from bootloader:
 
 ```bash
+unzip boot-images.zip
+cat super.img.part-* > super.img
 fastboot flash boot boot.img
 fastboot flash dtbo dtbo.img
 fastboot flash init_boot init_boot.img

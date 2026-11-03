@@ -85,10 +85,12 @@ for the full description):
 ## Flashing
 
 Flash the latest **Android 16** stock image from Google first (both slots), then download
-the `images.zip` from [the releases](https://git.deusch.me/ubports/device-google-husky/releases/tag/latest-main),
-and from the bootloader:
+`boot-images.zip` and all `super.img.part-*` files from [the releases](https://github.com/l55-cmd/device-google-husky/releases/tag/latest-main)
+(assets are split because of GitHub's 2 GB per-file limit), and from the bootloader:
 
 ```bash
+unzip boot-images.zip
+cat super.img.part-* > super.img
 fastboot flash boot boot.img
 fastboot flash dtbo dtbo.img
 fastboot flash init_boot init_boot.img
