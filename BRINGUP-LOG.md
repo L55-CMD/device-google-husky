@@ -44,6 +44,30 @@ hangs in first seconds on zuma where LOS kernel doesn't. Delta candidates:
   dialog on phone -> adb shell cat /sys/fs/pstore/console-ramoops-0
   (ramoops flushes only on panic/clean-kmsg-dump; watchdog/ABL resets leave it empty)
 
+## Experiment matrix (flashed + watched)
+| Kernel variant | Result |
+|---|---|
+| Full halium (main) | FROZEN LOGO |
+| No halium.config fragment (test-no-halium-config) | FROZEN LOGO -> config exonerated |
+| No sched.h ABI padding 0001 (test-no-sched-padding) | FROZEN LOGO -> exonerated |
+| No binder.c hunk of 0014 (test-no-binder-patch) | building -> device images next |
+| No apparmor patches 0007-0012 (test-no-apparmor) | rebuilding (BT-as-modules fix) |
+| LOS kernel (reference) | boots to ~20s |
+
+Build gotchas learned:
+- GKI trim build requires BT/RFKILL as MODULES (0014 config hunk makes them =m;
+  dropping 0014 config side without compensation fails with 'Unable to find
+  net/bluetooth/bluetooth.ko')
+- halium.config: hci_vhci needs CONFIG_BT_HCIVHCI; MODULE_OUTS entry must match config
+- 0014's halium.config hunk also edits AppArmor lines -> can't be used verbatim
+  when the apparmor patches are dropped
+- experiment loop: kernel-patches branch + manifest branch (revision pointer) +
+  workflow_dispatch + device branch of same name + device dispatch; ~1h per round
+
+Next if all patch experiments fail: pin prebuilts/clang/host/linux-x86 to
+r487747c (clang 17.0.2, what LOS builds with; manifest currently floats with
+the AOSP tag = newer clang) - possible miscompile of zuma early-boot code.
+
 ## Phone facts
 - serial 38111FDJG001WM, slot b, bootloader unlocked
 - stock firmware: Android 16 (was QPR3 beta - never confirmed which stock build)
