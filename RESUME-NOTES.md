@@ -7,13 +7,25 @@ pivot to GitHub. CI adapted: Forgejo workflows replaced with GitHub Actions
 replaced by release assets of a <owner>/husky-packages repo (per-branch release
 tags + "main" fallback, which matches assemble-final-image.sh's resolver).
 
-## Needed from user to continue
-- GitHub username + classic PAT (repo + workflow scopes) -> I create 4 repos
-  (device-google-husky, lineage-kernel-manifest-husky, kernel-patches-husky,
-  husky-packages), replace the __GITHUB_OWNER__ placeholder in
-  lineage-kernel-manifest-husky/default.xml, push, and upload package assets
-  (system.img.zip + libhybris-16-update.tar.xz from deusch public registry,
-  plus the already-downloaded lineage zip from ~/husky-verify).
+## Pushed to GitHub (2026-11-03) - repos live
+- https://github.com/Luk3-ss/device-google-husky (main)
+- https://github.com/Luk3-ss/lineage-kernel-manifest-husky (main)
+- https://github.com/Luk3-ss/kernel-patches-husky (halium-husky)
+- https://github.com/Luk3-ss/husky-packages: release tag "main" with
+  system.img.zip + libhybris-16-update.tar.xz (mirrored from deusch public
+  registry) + lineage-23.2-20261009 zip (sha256-verified local copy kept at
+  ~/husky-verify). kernel.zip is published by kernel CI into the kernel repo's
+  own per-branch releases (GITHUB_TOKEN can't write cross-repo).
+
+## BLOCKER: GitHub account locked (billing)
+First kernel CI run failed instantly: "your account is locked due to a
+billing issue". Actions will not run until Luk3-ss fixes it at
+https://github.com/settings/billing (usually an expired card on file or an
+old unpaid invoice; updating/removing the payment method unlocks it).
+After it is fixed: re-run the failed workflow (Actions -> build-kernel ->
+Re-run jobs) or push any commit; then the device repo build-final will
+produce images.zip on its rolling latest-main release.
+Token used for setup should be revoked by the user once everything runs.
 
 ## Local repos (ready to push)
 - ~/device-google-husky           branch main          (4 commits: tegu import -> husky adapt -> BRINGUP.md -> ExecStart fix)
