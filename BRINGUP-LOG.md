@@ -51,8 +51,22 @@ hangs in first seconds on zuma where LOS kernel doesn't. Delta candidates:
 | No halium.config fragment (test-no-halium-config) | FROZEN LOGO -> config exonerated |
 | No sched.h ABI padding 0001 (test-no-sched-padding) | FROZEN LOGO -> exonerated |
 | No binder.c hunk of 0014 (test-no-binder-patch) | building -> device images next |
-| No apparmor patches 0007-0012 (test-no-apparmor) | rebuilding (BT-as-modules fix) |
+| No apparmor patches 0007-0012 (test-no-apparmor) | FROZEN LOGO -> exonerated |
+| clang r487747c pinned (test-clang-r487747c) | FROZEN LOGO -> exonerated |
 | LOS kernel (reference) | boots to ~20s |
+| kernel/common android14-6.1-2025-08_r12 (test-kernel-r12) | building - LEAD THEORY |
+
+## Lead theory: kernel base too old (TLBI erratum)
+LOS pins kernel/common android14-6.1-2025-08_r12; tegu manifest had _r8 (4 respins
+behind). Config diff vs LOS kernel showed CONFIG_ARM64_ERRATUM_4118414=y in LOS,
+absent in ours - the CVE-2025-10263 TLBI completion erratum affects Cortex-X4
+and the whole X/A7xx family (same mitigation series covers Cortex-X3 = zuma's
+big core). A kernel without the mitigation can hard-hang in the first seconds
+on affected silicon - matches our symptom exactly (hang before ramoops probe).
+tegu/zumapro silicon presumably predates or misses the erratum, which is why
+tegu works on r8.
+
+## Experiment loop learnings
 
 Build gotchas learned:
 - GKI trim build requires BT/RFKILL as MODULES (0014 config hunk makes them =m;
