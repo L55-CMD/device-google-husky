@@ -8,7 +8,7 @@ Before=mount-halium-overlay.service lxc-android-config.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/libexec/lxc-android-config/fixup-overlay-tegu
+ExecStart=/usr/libexec/lxc-android-config/fixup-overlay-husky
 
 [Install]
 WantedBy=sysinit.target
