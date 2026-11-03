@@ -1,5 +1,33 @@
 # Husky bring-up log (2026-11-03, evening session)
 
+## RESUME HERE (state at end of day 1)
+**Running now:** `test-kernel-r12` kernel build on GitHub CI (dispatched ~23:05 UTC).
+Check: `https://github.com/l55-cmd/lineage-kernel-manifest-husky/actions` (branch test-kernel-r12).
+
+**When the kernel build succeeds:** dispatch device build (branch `test-kernel-r12`
+already exists in the device repo):
+`POST /repos/l55-cmd/device-google-husky/actions/workflows/build-final.yml/dispatches {"ref":"test-kernel-r12"}`
+
+**When device images land:** download
+`https://github.com/l55-cmd/device-google-husky/releases/download/latest-test-kernel-r12/boot-images.zip`
+→ phone to fastboot (Power+VolDown) → flash boot stack (super unchanged, ours
+is still on the phone) → reboot → WATCH SCREEN. Success = anything other than
+frozen white Google logo.
+
+**If r12 boots:** permanent fix = bump kernel/common to android14-6.1-2025-08_r12
+in lineage-kernel-manifest-husky default.xml on MAIN. Then continue normal
+bring-up (display/touch/WiFi/audio matrix per README).
+
+**If r12 still hangs:** verify the r12 tag actually contains
+CONFIG_ARM64_ERRATUM_4118414 (extract IKCFG from a local build or check AOSP
+tag contents) before more cycles; then compare kleaf flags against LOS's
+published kernel build config, and diff LOS's gs-6.1 lineage-23.2 branches for
+out-of-tree erratum patches.
+
+Token: API/dispatch calls need a fresh classic PAT from the user (repo+workflow
+scope); previous tokens were chat-visible - assume revoked. CI runs themselves
+need no secrets (GITHUB_TOKEN only).
+
 ## Pipeline status (all green)
 - kernel.zip + boot images + super.img building and publishing on GitHub CI (l55-cmd)
 - Images flashed to Pixel 8 Pro successfully (slot b)
