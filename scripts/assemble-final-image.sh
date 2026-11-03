@@ -18,9 +18,10 @@ package_registry_base="${PACKAGE_REGISTRY_BASE:?PACKAGE_REGISTRY_BASE is require
 package_branch="${PACKAGE_BRANCH:?PACKAGE_BRANCH is required}"
 
 resolve_package_url() {
-    local filename="$1"
-    local primary="${package_registry_base}/${package_branch}/${filename}"
-    local fallback="${package_registry_base}/main/${filename}"
+    local base="$1"
+    local filename="$2"
+    local primary="${base}/${package_branch}/${filename}"
+    local fallback="${base}/main/${filename}"
     local status
     status="$(curl -sS -L -o /dev/null -r 0-0 -w '%{http_code}' "${primary}")"
     case "${status}" in
@@ -42,9 +43,12 @@ resolve_package_url() {
     return 1
 }
 
-halium_system_url="$(resolve_package_url system.img.zip)"
-kernel_images_url="$(resolve_package_url kernel.zip)"
-libhybris_update_url="$(resolve_package_url libhybris-16-update.tar.xz)"
+halium_system_url="$(resolve_package_url "${package_registry_base}" system.img.zip)"
+libhybris_update_url="$(resolve_package_url "${package_registry_base}" libhybris-16-update.tar.xz)"
+# kernel.zip lives in the kernel manifest repo's per-branch releases
+# (override with KERNEL_REGISTRY_BASE if hosted elsewhere).
+kernel_registry_base="${KERNEL_REGISTRY_BASE:-${package_registry_base}}"
+kernel_images_url="$(resolve_package_url "${kernel_registry_base}" kernel.zip)"
 
 build_patches_dir="${repo_root}/build-patches/halium-generic-adaptation-build-tools"
 kernel_work_dir="${work_dir}/kernel"

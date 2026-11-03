@@ -25,6 +25,8 @@ env:
   # resolved from <base>/<branch>/<file> with fallback to <base>/main/<file>,
   # which maps to release assets of the husky-packages repo.
   PACKAGE_REGISTRY_BASE: https://github.com/${{ github.repository_owner }}/husky-packages/releases/download
+  # kernel.zip is published by the kernel manifest CI into its own repo releases
+  KERNEL_REGISTRY_BASE: https://github.com/${{ github.repository_owner }}/lineage-kernel-manifest-husky/releases/download
   # Hosted as an asset of the husky-packages release (LOS only keeps the last
   # ~3 builds on its own mirror, so we self-host it):
   #   lineage-23.2-20261009-nightly-husky-signed.zip
@@ -34,6 +36,8 @@ env:
 jobs:
   final-artifacts:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4

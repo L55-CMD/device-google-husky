@@ -19,6 +19,7 @@ docker run --rm --privileged \
     -e BUILD_TOOLS_BRANCH="${BUILD_TOOLS_BRANCH:-unified-recovery}" \
     -e BUILD_TOOLS_REPO="${BUILD_TOOLS_REPO:-https://gitlab.com/ubports/porting/community-ports/halium-generic-adaptation-build-tools.git}" \
     -e PACKAGE_REGISTRY_BASE="${PACKAGE_REGISTRY_BASE:-}" \
+    -e KERNEL_REGISTRY_BASE="${KERNEL_REGISTRY_BASE:-}" \
     -e PACKAGE_BRANCH="${PACKAGE_BRANCH:-}" \
     "${docker_volumes[@]}" \
     -w "$(pwd)" \
