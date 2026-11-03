@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Halium 16 (Android 16) specific LXC container fixes
+
+# 1. Set up cgroups v2 hierarchy for Android's libprocessgroup
+#    Android 16 expects /sys/fs/cgroup/system/ with write access for uid 1000 (system)
+mkdir -p /sys/fs/cgroup/system
+echo "+memory +cpu +cpuset" > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
+echo "+memory +cpu +cpuset" > /sys/fs/cgroup/system/cgroup.subtree_control 2>/dev/null || true
+chown -R 1000:1000 /sys/fs/cgroup/system/

@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Strip reboot_on_failure directives from Android init .rc files.
+# In Android 12+, services like apexd, vold, netbpfload use reboot_on_failure
+# which calls sysrq "Terminate All Tasks" — not namespaced in LXC containers.
+# Even with sysrq=0 this is belt-and-suspenders safety.
+
+find $LXC_ROOTFS_PATH/system/etc/init/ -name '*.rc' -exec \
+    sed -i '/reboot_on_failure/d' {} +
+
+# Also check the root init.rc and hw/ subdirectory
+sed -i '/reboot_on_failure/d' $LXC_ROOTFS_PATH/system/etc/init/hw/init.rc 2>/dev/null || true

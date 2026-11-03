@@ -1,0 +1,46 @@
+deviceinfo_name="Google Pixel 9a"
+deviceinfo_manufacturer="Google"
+deviceinfo_codename="tegu"
+deviceinfo_arch="aarch64"
+
+# Kernel - using Halium-patched android14-6.1 GKI kernel
+deviceinfo_kernel_source="https://gitlab.com/ubports/porting/community-ports/android12/generic/kernel-android-common.git"
+deviceinfo_kernel_source_branch="android14-6.1-halium"
+deviceinfo_kernel_defconfig="gki_defconfig halium.config"
+deviceinfo_kernel_clang_compile="true"
+deviceinfo_kernel_llvm_compile="true"
+deviceinfo_kernel_image_name="Image.lz4"
+
+# Kernel cmdline
+# Stock LineageOS: earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 ...
+# Added: console=tty0 (required for Ubuntu Touch rootfs), systempart=/dev/mapper/system
+deviceinfo_kernel_cmdline="lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,apparmor,selinux console=tty0 earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 printk.devkmsg=on cgroup.memory=nokmem rcupdate.rcu_expedited=1 rcu_nocbs=all rcutree.enable_rcu_lazy swiotlb=noforce disable_dma32=on at24.write_timeout=100 log_buf_len=1024K bootconfig systempart=/dev/mapper/system kvm-arm.mode=nvhe exynos_drm.dp_rate=2"
+
+# Boot image - extracted from LineageOS vendor_kernel_boot.img
+deviceinfo_ramdisk_compression="lz4"
+deviceinfo_bootimg_prebuilt_dtb="google-tegu.dtb"
+deviceinfo_flash_pagesize="2048"
+deviceinfo_flash_offset_base="0x0"
+deviceinfo_flash_offset_kernel="0x10008000"
+deviceinfo_flash_offset_ramdisk="0x11000000"
+deviceinfo_flash_offset_tags="0x10000100"
+deviceinfo_flash_offset_dtb="0x11f00000"
+deviceinfo_bootimg_qcdt="false"
+deviceinfo_bootimg_header_version="4"
+deviceinfo_bootimg_partition_size="$((64*$((2**20))))"
+deviceinfo_bootimg_os_version="16"
+deviceinfo_bootimg_os_patch_level="2026-03"
+deviceinfo_bootimg_has_init_boot_partition="true"
+
+# Bootconfig
+deviceinfo_vendor_bootconfig_path="bootconfig"
+
+# Rootfs
+deviceinfo_rootfs_image_sector_size="4096"
+deviceinfo_system_partition_size="3500M"
+
+# Halium / Ubuntu Touch
+deviceinfo_halium_version="16"
+deviceinfo_ubuntu_touch_release="24.04-1.x"
+deviceinfo_use_unified_recovery="true"
+deviceinfo_unified_recovery_ui_density="xxhdpi"

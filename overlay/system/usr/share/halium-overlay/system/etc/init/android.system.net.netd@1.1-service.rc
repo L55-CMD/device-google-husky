@@ -1,0 +1,5 @@
+service netd-hal-1-1-stub /system/bin/hw/android.system.net.netd@1.1-service.stub_HALIUM_DISABLED
+    class hal
+    user system
+    group system
+    disabled

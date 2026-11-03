@@ -1,0 +1,13 @@
+[Unit]
+Description=USB DisplayPort gbinder client (tegu)
+After=lxc-android-config.service
+Requires=lxc-android-config.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/usbdp_gbinder
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# device-hacks for Pixel 9a (tegu) - Halium 16 / Android 16
+
+# Android 16 ashmem requires /dev/ashmem<boot_id> but kernel only creates /dev/ashmem
+# Create symlink on host and in Android container
+BOOT_ID=$(cat /proc/sys/kernel/random/boot_id)
+if [ -c /dev/ashmem ] && [ ! -e "/dev/ashmem${BOOT_ID}" ]; then
+    ln -sf /dev/ashmem "/dev/ashmem${BOOT_ID}"
+fi
+lxc-attach -n android --clear-env -- /system/bin/ln -sf /dev/ashmem "/dev/ashmem${BOOT_ID}"
+
+# DMA-BUF heaps need write access for Codec2 buffer allocation
+# Both host and container need this
+chmod 666 /dev/dma_heap/system /dev/dma_heap/system-uncached /dev/dma_heap/video_system /dev/dma_heap/video_system-uncached 2>/dev/null
+lxc-attach -n android --clear-env -- /system/bin/chmod 666 /dev/dma_heap/system /dev/dma_heap/system-uncached /dev/dma_heap/video_system /dev/dma_heap/video_system-uncached 2>/dev/null
+
+# Wait for vendor init to finish bringing up devices, otherwise the sysfs
+# nodes may not exist yet or get re-enabled afterwards
+while [ "$(getprop vendor.all.devices.ready 2>/dev/null)" != "1" ]; do
+    sleep 1
+done
+
+# Disable Google touch offload co-processor filtering
+# The offload pipeline does edge/grip rejection that blocks swipe gestures
+# from the middle of screen edges (needed for Ubuntu Touch edge gestures)
+echo 0 > /sys/devices/virtual/goog_touch_interface/gti.0/offload_enabled 2>/dev/null
+echo 0 > /sys/devices/virtual/goog_touch_interface/gti.0/v4l2_enabled 2>/dev/null

@@ -1,0 +1,11 @@
+# Android 16 APEX libraries for Halium 16
+/{,android/}{,system/}apex/com.android.i18n/lib{,64}/**     r,
+/{,android/}{,system/}apex/com.android.i18n/lib{,64}/**.so  m,
+/{,android/}{,system/}apex/com.android.media/lib{,64}/**     r,
+/{,android/}{,system/}apex/com.android.media/lib{,64}/**.so  m,
+/{,android/}{,system/}apex/com.android.media.swcodec/lib{,64}/**     r,
+/{,android/}{,system/}apex/com.android.media.swcodec/lib{,64}/**.so  m,
+/{,android/}{,system/}apex/com.android.vndk.v[0-9][0-9]/lib{,64}/**     r,
+/{,android/}{,system/}apex/com.android.vndk.v[0-9][0-9]/lib{,64}/**.so  m,
+/{,android/}{,system/}apex/com.android.conscrypt/lib{,64}/**     r,
+/{,android/}{,system/}apex/com.android.conscrypt/lib{,64}/**.so  m,

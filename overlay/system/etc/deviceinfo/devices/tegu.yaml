@@ -1,0 +1,15 @@
+tegu:
+  Name: tegu
+  PrettyName: "Google Pixel 9a"
+  Vendor: Google
+  DeviceType: phone
+  GridUnit: 23
+  WebkitDpr: 2.5
+  SupportedOrientations:
+    - Portrait
+    - InvertedPortrait
+    - Landscape
+    - InvertedLandscape
+  PrimaryOrientation: Portrait
+  OfonoPlugin: binder
+  OfonoImplementsIms: true

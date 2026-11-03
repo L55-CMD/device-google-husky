@@ -1,0 +1,18 @@
+#!/bin/sh -eu
+
+# Add phablet (uid 32011) to the kvm group via NSS extrausers.
+# /etc/group is on the read-only rootfs so usermod cannot modify it
+# (it exits 0 but the rename of /etc/group.new fails silently).
+# /etc/nsswitch.conf has "group: files extrausers", and glibc aggregates
+# supplementary group memberships across both sources.
+
+GROUP_FILE=/var/lib/extrausers/group
+
+[ -e "$GROUP_FILE" ] || exit 0
+grep -q '^kvm:' "$GROUP_FILE" && exit 0
+
+KVM_GID=$(getent group kvm | cut -d: -f3)
+USERNAME=$(getent passwd 32011 | cut -d: -f1)
+[ -n "$KVM_GID" ] && [ -n "$USERNAME" ] || exit 0
+
+echo "kvm:x:${KVM_GID}:${USERNAME}" >> "$GROUP_FILE"

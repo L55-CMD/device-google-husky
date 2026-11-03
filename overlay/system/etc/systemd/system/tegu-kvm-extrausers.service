@@ -1,0 +1,12 @@
+[Unit]
+Description=Add phablet to kvm group via NSS extrausers (read-only rootfs workaround)
+After=local-fs.target
+Before=systemd-user-sessions.service display-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/lxc-android-config/tegu-kvm-extrausers
+
+[Install]
+WantedBy=multi-user.target

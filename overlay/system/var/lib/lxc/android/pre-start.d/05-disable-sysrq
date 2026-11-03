@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Disable sysrq to prevent Android init's reboot_on_failure from killing
+# the host via /proc/sysrq-trigger. Android 12+ services like apexd and vold
+# use reboot_on_failure which triggers "Terminate All Tasks" sysrq — this is
+# not namespaced and kills all host processes including systemd and SSH.
+echo 0 > /proc/sys/kernel/sysrq

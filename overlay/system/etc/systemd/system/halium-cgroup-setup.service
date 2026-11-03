@@ -1,0 +1,16 @@
+[Unit]
+Description=Set up cgroups v2 for Android container
+DefaultDependencies=no
+Before=lxc-android-config.service lxc@android.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '\
+  mkdir -p /sys/fs/cgroup/system && \
+  echo "+memory +cpu +cpuset +io" > /sys/fs/cgroup/system/cgroup.subtree_control && \
+  chown -R 1000:1000 /sys/fs/cgroup/system/'
+
+[Install]
+WantedBy=sysinit.target

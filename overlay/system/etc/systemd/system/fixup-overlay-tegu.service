@@ -1,0 +1,14 @@
+[Unit]
+Description=Halium 16 tegu: overlayfs + halium-overlay + fixups
+DefaultDependencies=no
+Requires=mount-android-system.service mount-android-partitions.service
+After=mount-android-system.service mount-android-partitions.service
+Before=mount-halium-overlay.service lxc-android-config.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/lxc-android-config/fixup-overlay-tegu
+
+[Install]
+WantedBy=sysinit.target

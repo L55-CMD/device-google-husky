@@ -1,0 +1,21 @@
+include:
+  - https://gitlab.com/ubports/porting/community-ports/halium-generic-adaptation-build-tools/-/raw/main/gsi-port-ci.yml
+
+variables:
+  OTA_CHANNEL: "utnext/arm64/android9plus/daily"
+  ADAPTATION_TOOLS_BRANCH: "unified-recovery"
+
+image: ubuntu:20.04
+
+devel-flashable:
+  tags: [ubports]
+  after_script:
+    - apt install -y zstd
+    - zstd -15 -T0 out/ubuntu.img
+    - rm -f out/ubuntu.img
+  artifacts:
+    paths:
+      - out/boot*.img
+      - out/init_boot.img
+      - out/vendor_boot.img
+      - out/ubuntu.img.zst

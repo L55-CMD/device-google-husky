@@ -1,0 +1,54 @@
+diff --git a/prepare-fake-ota.sh b/prepare-fake-ota.sh
+index 215dcbb..db6c310 100755
+--- a/prepare-fake-ota.sh
++++ b/prepare-fake-ota.sh
+@@ -72,6 +72,11 @@ case "$deviceinfo_halium_version" in
+     14)
+         DEVICE_GENERIC_URL="$DEVICE_GENERIC_URL_BASE/halium-14.0/lastSuccessfulBuild/artifact/halium_halium_arm64.tar.xz"
+         ;;
++    16)
++        # Local halium-16 GSI built from halium-build tree
++        DEVICE_GENERIC_URL="halium_halium_arm64.tar.xz"
++        DEVICE_GENERIC_LOCAL="${HERE}/ota/halium_halium_arm64-16.tar.xz"
++        ;;
+     *)
+         print_error "Unsupported halium version: '$deviceinfo_halium_version'"
+         exit 1
+@@ -151,10 +156,22 @@ file="rootfs.tar.xz"
+ touch "$OUTPUT/$file.asc"
+ echo "update $file $file.asc" >> "$OUTPUT/ubuntu_command"
+ 
++# libhybris update overlay (halium-16 only)
++LIBHYBRIS_UPDATE="${HERE}/ota/libhybris-16-update.tar.xz"
++if [ "$deviceinfo_halium_version" = "16" ] && [ -f "$LIBHYBRIS_UPDATE" ]; then
++    file="libhybris-16-update.tar.xz"
++    cp "$LIBHYBRIS_UPDATE" "$OUTPUT/$file"
++    touch "$OUTPUT/$file.asc"
++    echo "update $file $file.asc" >> "$OUTPUT/ubuntu_command"
++fi
++
+ # Device-generic tarball (Halium GSI)
+ file=$(basename "$DEVICE_GENERIC_URL")
+ if [ -f "$OUTPUT/$file" ]; then
+     print_info "File ("$OUTPUT/$file") already exists, skipping download."
++elif [ -n "$DEVICE_GENERIC_LOCAL" ] && [ -f "$DEVICE_GENERIC_LOCAL" ]; then
++    print_info "Copying local GSI: $DEVICE_GENERIC_LOCAL"
++    cp "$DEVICE_GENERIC_LOCAL" "$OUTPUT/$file"
+ else
+     download_file "$DEVICE_GENERIC_URL" "$OUTPUT"
+ fi
+diff --git a/setup_repositories.sh b/setup_repositories.sh
+index 58bfeb0..3515449 100644
+--- a/setup_repositories.sh
++++ b/setup_repositories.sh
+@@ -121,6 +121,10 @@ setup_clang() {
+                 CLANG_BRANCH="main-kernel-build-2023"
+                 CLANG_REVISION="r487747c"
+                 ;;
++            16)
++                CLANG_BRANCH="main-kernel-build-2023"
++                CLANG_REVISION="r487747c"
++                ;;
+ 
+             *)
+                 print_error "Clang is not supported with halium version '$deviceinfo_halium_version'"

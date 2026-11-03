@@ -1,0 +1,6 @@
+# DMA-BUF heaps for Codec2 buffer allocation (Android 16)
+/dev/dma_heap/** rw,
+
+# ORC JIT compilation
+owner /run/user/[0-9]*/orcexec.* mrw,
+owner @{HOME}/orcexec.* mrw,

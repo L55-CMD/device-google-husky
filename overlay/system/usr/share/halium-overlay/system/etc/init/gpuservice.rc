@@ -1,0 +1,5 @@
+service gpu /system/bin/gpuservice_HALIUM_DISABLED
+    class core
+    user gpu_service
+    group graphics readtracefs
+    disabled

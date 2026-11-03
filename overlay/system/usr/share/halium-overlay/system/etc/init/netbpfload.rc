@@ -1,0 +1,5 @@
+# Halium: reboot_on_failure removed (kills host in LXC container)
+service bpfloader /system/bin/false
+    user root
+    oneshot
+    updatable

@@ -1,0 +1,54 @@
+#!/bin/sh -eu
+
+# Halium 16 (tegu): Make /android/system writable via overlayfs,
+# copy halium-overlay files, and remove problematic APEXes.
+# This replaces mount-halium-overlay's bind-mount approach which
+# conflicts with overlayfs, and enables pre-start hooks to work
+# on the now-writable filesystem.
+
+log() {
+    echo "$*" >&2
+}
+
+# Create dummy file for sysrq-trigger bind-mount (instead of /dev/null,
+# which gets its permissions broken by Android init's chmod)
+touch /run/lxc-android-sysrq-dummy
+
+# Set up overlayfs on /android/system
+log "Setting up overlayfs on /android/system"
+mkdir -p /tmp/android-system-upper /tmp/android-system-work
+mount -t overlay halium-ovl-system \
+    -o lowerdir=/android/system,upperdir=/tmp/android-system-upper,workdir=/tmp/android-system-work \
+    /android/system
+
+# Set up overlayfs on /android/vendor
+log "Setting up overlayfs on /android/vendor"
+mkdir -p /tmp/android-vendor-upper /tmp/android-vendor-work
+mount -t overlay halium-ovl-vendor \
+    -o lowerdir=/android/vendor,upperdir=/tmp/android-vendor-upper,workdir=/tmp/android-vendor-work \
+    /android/vendor
+
+# Copy halium-overlay files into the now-writable filesystems
+if [ -d /usr/share/halium-overlay/system ]; then
+    log "Copying halium-overlay/system"
+    rsync -a /usr/share/halium-overlay/system/ /android/system/
+fi
+if [ -d /usr/share/halium-overlay/vendor ]; then
+    log "Copying halium-overlay/vendor"
+    rsync -a /usr/share/halium-overlay/vendor/ /android/vendor/
+fi
+
+# Remove APEXes that cause problems in the LXC container.
+# Tethering APEX contains netbpfload with reboot_on_failure inside its
+# .rc file (unreachable by overlay). netd is disabled so the missing
+# libnetd_updatable.so is not a problem.
+log "Removing problematic APEXes"
+rm -f /android/system/apex/com.android.tethering.capex
+
+# Strip reboot_on_failure from all .rc files (belt-and-suspenders)
+log "Stripping reboot_on_failure from init .rc files"
+find /android/system/etc/init/ -name '*.rc' -exec \
+    sed -i '/reboot_on_failure/d' {} +
+sed -i '/reboot_on_failure/d' /android/system/etc/init/hw/init.rc 2>/dev/null || true
+find /android/vendor/etc/init/ -name '*.rc' -exec \
+    sed -i '/reboot_on_failure/d' {} +
