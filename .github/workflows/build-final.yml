@@ -72,17 +72,19 @@ jobs:
                      '$(pwd)/workdir/super' && \
                    (cd artifacts && sha256sum super.img >> SHA256SUMS)"
 
-      - name: Package images.zip
+      - name: Package images
         run: |
           set -euo pipefail
           mkdir -p package
-          (cd artifacts && zip -j "$(pwd)/../package/images.zip" \
+          # GitHub release assets are capped at 2 GB each, so boot images and
+          # super.img ship separately; super.img is split into parts.
+          (cd artifacts && zip -j "$(pwd)/../package/boot-images.zip" \
             boot.img \
             dtbo.img \
             init_boot.img \
             vendor_boot.img \
-            vendor_kernel_boot.img \
-            super.img)
+            vendor_kernel_boot.img)
+          (cd artifacts && split -b 1800m super.img "$(pwd)/../package/super.img.part-")
 
       - name: Publish images.zip to rolling release
         env:
@@ -93,7 +95,7 @@ jobs:
           tag="latest-${branch_tag}"
           # Rolling release: recreate the tag so it always points at this build.
           gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "${tag}" package/images.zip \
+          gh release create "${tag}" package/boot-images.zip package/super.img.part-* \
             --title "Latest build (${branch_tag})" \
             --notes "Rolling latest build for branch \`${branch_tag}\` (commit ${{ github.sha }})." \
             --latest=false
