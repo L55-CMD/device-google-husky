@@ -1,0 +1,94 @@
+name: build-final
+
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'build-patches/**'
+      - 'overlay/**'
+      - 'ramdisk-overlay/**'
+      - 'ramdisk-recovery-overlay/**'
+      - 'scripts/**'
+      - 'vendor-ramdisk-overlay/**'
+      - 'bootconfig'
+      - 'build.sh'
+      - 'deviceinfo'
+      - 'Dockerfile'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+env:
+  BUILD_TOOLS_BRANCH: main
+  BUILD_TOOLS_REPO: https://gitlab.com/ubports/porting/community-ports/halium-generic-adaptation-build-tools.git
+  # Packages (kernel.zip / system.img.zip / libhybris-16-update.tar.xz) are
+  # resolved from <base>/<branch>/<file> with fallback to <base>/main/<file>,
+  # which maps to release assets of the husky-packages repo.
+  PACKAGE_REGISTRY_BASE: https://github.com/${{ github.repository_owner }}/husky-packages/releases/download
+  # Hosted as an asset of the husky-packages release (LOS only keeps the last
+  # ~3 builds on its own mirror, so we self-host it):
+  #   lineage-23.2-20261009-nightly-husky-signed.zip
+  #   sha256: 7b3cd1db0b76d043f4270a23c89e382894c955d77e2cc23b6f10986f7d2167a2
+  LINEAGE_ZIP_URL: https://github.com/${{ github.repository_owner }}/husky-packages/releases/download/main/lineage-23.2-20261009-nightly-husky-signed.zip
+
+jobs:
+  final-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute package branch
+        id: pkgbranch
+        run: |
+          set -euo pipefail
+          branch="$(printf '%s' "${{ github.ref_name }}" | sed 's#[^A-Za-z0-9_.-]#-#g')"
+          echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build final Ubuntu Touch artifacts in Docker
+        env:
+          IMAGE_TAG: husky-final-builder:ci
+          PACKAGE_BRANCH: ${{ steps.pkgbranch.outputs.branch }}
+        run: ./scripts/run-docker-build.sh
+
+      - name: Build super.img
+        run: |
+          set -euo pipefail
+          # lpmake/simg2img come from the alpine android-tools package;
+          # run the whole step inside a throwaway container.
+          docker run --rm \
+            -v "$(pwd):$(pwd)" -w "$(pwd)" \
+            alpine:3.20 \
+            sh -c "apk add --no-cache android-tools curl unzip coreutils bash docker-cli >/dev/null && \
+                   ./scripts/build-super-image.sh \
+                     '${LINEAGE_ZIP_URL}' \
+                     '$(pwd)/artifacts' \
+                     '$(pwd)/artifacts/super.img' \
+                     '$(pwd)/workdir/super' && \
+                   (cd artifacts && sha256sum super.img >> SHA256SUMS)"
+
+      - name: Package images.zip
+        run: |
+          set -euo pipefail
+          mkdir -p package
+          (cd artifacts && zip -j "$(pwd)/../package/images.zip" \
+            boot.img \
+            dtbo.img \
+            init_boot.img \
+            vendor_boot.img \
+            vendor_kernel_boot.img \
+            super.img)
+
+      - name: Publish images.zip to rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch_tag="$(printf '%s' "${{ github.ref_name }}" | sed 's#[^A-Za-z0-9_.-]#-#g')"
+          tag="latest-${branch_tag}"
+          # Rolling release: recreate the tag so it always points at this build.
+          gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "${tag}" package/images.zip \
+            --title "Latest build (${branch_tag})" \
+            --notes "Rolling latest build for branch \`${branch_tag}\` (commit ${{ github.sha }})." \
+            --latest=false
