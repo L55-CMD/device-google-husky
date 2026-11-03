@@ -1,8 +1,19 @@
 # Husky port - resume notes (2026-11-03)
 
 State: all three repos prepared LOCALLY, committed, NOT pushed anywhere.
-Remote repos do NOT exist yet on git.deusch.me (404 at last check).
-No git credentials/token collected yet.
+deusch.me migration: user has NO login on git.deusch.me (Steffen's instance) ->
+pivot to GitHub. CI adapted: Forgejo workflows replaced with GitHub Actions
+(.github/workflows/), --volumes-from replaced with bind mounts, package registry
+replaced by release assets of a <owner>/husky-packages repo (per-branch release
+tags + "main" fallback, which matches assemble-final-image.sh's resolver).
+
+## Needed from user to continue
+- GitHub username + classic PAT (repo + workflow scopes) -> I create 4 repos
+  (device-google-husky, lineage-kernel-manifest-husky, kernel-patches-husky,
+  husky-packages), replace the __GITHUB_OWNER__ placeholder in
+  lineage-kernel-manifest-husky/default.xml, push, and upload package assets
+  (system.img.zip + libhybris-16-update.tar.xz from deusch public registry,
+  plus the already-downloaded lineage zip from ~/husky-verify).
 
 ## Local repos (ready to push)
 - ~/device-google-husky           branch main          (4 commits: tegu import -> husky adapt -> BRINGUP.md -> ExecStart fix)
