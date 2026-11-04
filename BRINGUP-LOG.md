@@ -1,5 +1,38 @@
 # Husky bring-up log
 
+## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
+Kernel is NOT hanging - it PANICS at ~1.41s every boot:
+  CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
+  (target: etm2dram_probe+0x1a8 [etm2dram]; expected type 0xd1c748b3)
+  Call trace: exynos_usbdrd_s2mpu_manual_control -> dwc3_exynos_probe (deferred probe)
+Mechanism: dwc3_exynos_usb's function pointer for exynos_usbdrd_s2mpu_manual_control
+CONTAINS THE ADDRESS OF etm2dram_probe - a cross-module binding/relocation fault INSIDE
+ONE consistent build (modules from same r12 build, kver matches). Classic thin-LTO
+mis-link signature. Our kernel: CONFIG_LTO_CLANG_THIN=y; LOS kernel: CONFIG_LTO_NONE=y.
+tegu (works, same patch set, byte-identical aosp/ patches) is on zumapro - zuma code +
+thin LTO + our patchset trips it; zumapro doesn't.
+
+VISIBILITY METHOD THAT WORKS (reuse this!): flash our boot.img + LOS vendor_boot +
+our init_boot/vkb/dtbo -> reboot (panics ~1.4s, screen dies, resets to fastboot ~40-90s
+or 'frozen logo' - cosmetic timing) -> flash full LOS stack -> fastboot reboot recovery
+-> adb (state shows 'recovery' after a while; accept auth dialog) -> cat
+/sys/fs/pstore/console-ramoops-0. Buffer holds 257KB incl. PRE-boot DSS panic record.
+
+ALSO LEARNED: any cmdline in boot.img changes failure flavor (reset vs frozen) -
+test with CI images; cmdline content bisect was a red herring.
+CFI_PERMISSIVE from halium.config silently not in effect (# CONFIG_CFI_PERMISSIVE is
+not set in built image) - wouldn't matter, the pointer itself is wrong.
+
+NEXT: r12-lto-none build (tools/bazel run --lto=none ... zuma_shusky_dist) - if it
+boots, permanent fix = disable LTO (match LOS). los-pure build = no halium patches
+axis also in flight. Watch for NEXT crash after USB PHY (display handoff / initrd
+rootfs mount) - pstore loop above gives eyes.
+
+pstore capture saved locally: ~/bootdebug/pstore-ours-kernel.txt (also 2-boot record
+in same buffer: u18:4 and u18:5, identical crash).
+
+---
+
 ## RESUME HERE (state at end of day 2 morning, 2026-11-04 ~09:10 UTC)
 **Running now:** TWO kernel builds on CI (pushed ~08:58 UTC, ~1h each):
 - `test-los-pure`: STOCK LOS kernel content (no halium patches/config) on our kleaf
