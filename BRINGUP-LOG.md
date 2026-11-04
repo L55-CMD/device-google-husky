@@ -1,4 +1,85 @@
-# Husky bring-up log (2026-11-03, evening session)
+# Husky bring-up log
+
+## RESUME HERE (state at end of day 2 morning, 2026-11-04 ~09:10 UTC)
+**Running now:** TWO kernel builds on CI (pushed ~08:58 UTC, ~1h each):
+- `test-los-pure`: STOCK LOS kernel content (no halium patches/config) on our kleaf
+  pipeline, kernel/common r12. Question: does our BUILD PIPELINE produce a booting kernel?
+  Boots to ~20s like LOS nightly -> pipeline exonerated, halium patches/config guilty.
+  Frozen -> kleaf flags/LTO/toolchain chain guilty.
+- `test-kernel-r12-lto-none`: r12 + halium patches/config but `--lto=none`
+  (LOS kernel is LTO_NONE=y, ours LTO_CLANG_THIN=y - never-tested axis).
+
+**When each kernel build succeeds:** dispatch device build on the SAME-named branch in
+device-google-husky (branches already created):
+`POST /repos/l55-cmd/device-google-husky/actions/workflows/build-final.yml/dispatches {"ref":"<branch>"}`
+
+**Then:** download boot-images.zip from release `latest-<branch>` -> phone to fastboot
+(Power+VolDown) -> flash boot stack (super unchanged) -> reboot -> watch screen.
+NOTE: after many failed boots ABL boot-loops and fastboot screen may be BLACK but USB
+fastboot still works - just flash. `fastboot set_active b` stabilizes.
+
+## Day 2 results (2026-11-04 morning)
+- r12 kernel VERIFIED to contain CONFIG_ARM64_ERRATUM_4118414=y (IKCONFIG extracted from
+  Image.lz4: lz4 legacy frame + IKCFG_ST magic; lz4.exe in ~/bin, python-lz4 CANNOT do it).
+  Erratum theory dead as sole cause: mitigation present, canonical r12 still FROZEN LOGO.
+- Canonical CI r12 boot-images (latest-test-kernel-r12): FROZEN LOGO (same as main r8).
+- Local repack r12 (kernel-only boot.img, empty cmdline): BLANK -> fastboot fallback (~60s).
+  Repack is NOT behavior-equivalent to CI image (bootconfig/ramdisk sections differ) -
+  always test with canonical CI images from now on.
+- r12 + boot.img cmdline lsm=selinux (no kvm override): FROZEN LOGO. Yesterday's
+  "lsm override progresses" was confounded by kvm-arm.mode=protected.
+- pstore empty after every failure mode - still zero kernel visibility into the hang.
+- LOS kernel + halium initrd (our init_boot) + LOS vkb/dtbo: boots past logo, dies
+  ~90-100s -> fastboot fallback. EXPECTED: LOS kernel config lacks SQUASHFS/PID_NS/
+  anbox-binder (config diff confirms) -> cannot mount UT rootfs. CONCLUSION: LOS kernel
+  alone cannot run UT userspace; we MUST make OUR kernel boot. Current builds test that.
+- Config diff ours(r12) vs LOS kernel: halium features + LTO thin-vs-none +
+  MODULE_SIG_PROTECT + default-LSM ordering only. Nothing else suspicious.
+
+## Key assets on this machine
+- ~/bootdebug: mkbootimg.py/unpack_bootimg.py, r12-ikconfig.txt, los-ikconfig.txt,
+  kernel-r12.lz4/raw, boot-r12-lsm.img (repack recipe: hdr v4, kernel-only,
+  --os_version 16.0.0 --os_patch_level 2026-09)
+- ~/bin/lz4.exe (handles legacy lz4 frame)
+- ~/husky-flash (our images + super), ~/husky-verify (LOS 23.2 stack),
+  /tmp/r12-boot (canonical r12 images; C:/Users/lukes/AppData/Local/Temp on Windows)
+- Branches: kernel manifest test-kernel-r12 (bumped common only),
+  test-kernel-r12-lto-none, test-los-pure; kernel-patches-husky@los-pure (stripped);
+  device repo branches of same names
+- CI dispatches need PAT (repo+workflow scope); watcher auto-dispatches device builds
+  when kernel builds succeed.
+
+## Experiment matrix (flashed + watched, day 1+2)
+| Kernel variant | Result |
+|---|---|
+| Full halium (main, r8) | FROZEN LOGO |
+| No halium.config fragment | FROZEN LOGO |
+| No sched.h ABI padding 0001 | FROZEN LOGO |
+| No binder.c hunk of 0014 | FROZEN LOGO |
+| No apparmor patches 0007-0012 | FROZEN LOGO |
+| clang r487747c pinned | FROZEN LOGO |
+| r12 canonical (erratum fix IN) | FROZEN LOGO |
+| r12 local repack, empty cmdline | BLANK -> fastboot (~60s) |
+| r12 + lsm=selinux cmdline | FROZEN LOGO |
+| LOS kernel + LOS stack | boots to ~20s, orderly shutdown (expected) |
+| LOS kernel + halium initrd | dies ~90-100s -> fastboot (UT fs unsupported) |
+| STOCK LOS content, our pipeline (test-los-pure) | BUILDING - pipeline test |
+| r12 + LTO_NONE (test-kernel-r12-lto-none) | BUILDING - LTO test |
+
+## Phone facts
+- serial 38111FDJG001WM, slot b, bootloader unlocked; stock was Android 16
+- After repeated boot failures: ABL boot-loops, rescue mode possible, fastboot screen
+  can be black while USB fastboot stays responsive.
+
+## Failure-mode glossary
+- FROZEN LOGO: ABL logo stays, kernel hangs in first 1-3s (before ramoops probe);
+  no pstore flush ever observed
+- BLANK -> fastboot: panel off then ABL fallback to fastboot (~60-100s)
+- los-pure boots to ~20s = pipeline exonerated; frozen = kleaf flags/LTO/toolchain guilty
+
+---
+# Day 1 log (archived)
+ (2026-11-03, evening session)
 
 ## RESUME HERE (state at end of day 1)
 **Running now:** `test-kernel-r12` kernel build on GitHub CI (dispatched ~23:05 UTC).
