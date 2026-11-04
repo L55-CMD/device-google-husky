@@ -128,6 +128,30 @@ Day 2 final state:
 
 ---
 
+## UPDATE 2026-11-04 ~20:20 UTC
+- FORENSICS VERDICT (local .ko binary diff, no CI): our phy_exynos_usbdrd_eusb_super.ko
+  and dwc3_exynos_usb.ko are BYTE-IDENTICAL to LOS prebuilt kernel's modules
+  (all relocs/symbols/section layouts; only .modinfo vermagic/scmversion + build-id
+  differ). NO build-time corruption. Saved: ~/work/forensics/ (both .kos,
+  analysis.txt, relocations-and-symbols.txt, analyze_modules.py).
+- TOOLCHAIN EXONERATED: both kernels built by identical clang 17.0.2 (r487747c)
+  + LLD 17.0.2 (banner strings identical).
+- REFERENCE KERNEL IDENTITY: LOS nightly husky kernel = GOOGLE'S OFFICIAL PREBUILT
+  GKI kernel (banner suffix -ab16017558 = AOSP CI build id), not a LOS custom build.
+  gki_defconfig there has NO LTO line (LTO_NONE = their GKI release default).
+- REMAINING SUSPECT: the GKI kernel image itself - its module loader CFI jump-table
+  fixup writes function addresses into module memory; wrong-offset writes would
+  stomp static callback pointers with random exported-symbol addresses = our
+  exact crash signature. Two builds queued:
+  1. test-r12-newkleaf: manifest bit-identical to LOS's (kleaf + prebuilts float
+     main-kernel-build-2023 instead of pinned 6b755daf + android-16.0.0_r0.0 tag)
+     + halium patches with LTO_NONE (0015+0016). Tests kleaf version.
+  2. test-r12-nocfi: halium LTO_NONE + aosp/0017 '# CONFIG_CFI_CLANG is not set'
+     appended to gki_defconfig. Tests CFI jump-table mechanism directly.
+  If nocfi boots -> CFI handling on zuma + our config is the bug; if newkleaf
+  boots -> old kleaf was the bug. If BOTH boot, main should take both fixes.
+---
+
 ## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
 Kernel is NOT hanging - it PANICS at ~1.41s every boot:
   CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
