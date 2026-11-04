@@ -82,6 +82,52 @@
 
 ---
 
+## UPDATE 2026-11-04 ~19:35 UTC (day 2 wrap-up)
+DECIDER RESULTS (test-los-pure-ltonone = stock LOS kernel content + LTO_NONE, our pipeline):
+- In OUR full stack: hang/reset ~2min, pstore record UNREADABLE from recovery:
+  'pstore: Invalid compression size for deflate: 0' = an EMPTY console capture
+  (record exists -> pstore probed; size 0 -> nothing was ever printed to it).
+- In FULL LOS stack: reset at ~55s, same empty-capture record.
+- REFERENCE: LOS's own nightly kernel + LOS stack = ~20s ORDERLY shutdown with
+  a FULL readable pstore capture.
+-> Our kleaf build of LOS content behaves DIFFERENTLY from LOS's own build.
+   TWO distinct failure signatures by patch state:
+   * halium patches ON:  CFI panic @1.4s, corrupted cross-module fn ptr
+     (deterministic site, random exported-symbol target per build)
+   * patches OFF:        hang/late-death with EMPTY console capture
+   COMMON: our build environment vs LOS's. Next suspects, in order:
+   1. HOW LOS builds: their gs-6.1 CI may not use kleaf at all (plain make via
+      build.config + their clang). Get LOS's exact build command/toolchain for
+      husky nightly kernels; replicate exactly (ASK STEFFON / read LOS wiki CI).
+   2. Toolchain version: our clang = r487747c-based 17.0.2 (AOSP tag float).
+      LOS may build with newer clang (r510928). clang-pin test was done under
+      THIN LTO; retry pin under the final config matrix if replicating LOS env.
+   3. Module post-processing delta: strip/sign/compress of .ko files
+      (kleaf default vs LOS). Compare phy-exynos-usbdrd-eusb-super.ko built by
+      us vs extracted from LOS zip: readelf -r / modinfo on both.
+- ACTIONABLE NEXT (no new builds needed): extract phy_exynos_usbdrd_eusb_super.ko
+  + dwc3_exynos_usb.ko from BOTH our kernel.zip AND the LOS nightly zip;
+  diff readelf -r output (relocations) and modinfo. If our .ko has bogus relocs
+  -> kleaf module link/postprocess is the bug -> move kernel build to LOS-style
+  (non-kleaf) build or fix the kleaf module pipeline flag.
+- pstore capture caveat: stock-config kernels write console records that the
+  recovery LOS kernel can't deflate-read (empty capture). Capture method only
+  works when the CRASHING kernel has a halium-ish console config.
+
+Day 2 final state:
+- Branches: kernel manifest: test-kernel-r12 (baseline), test-kernel-r12-lto-none
+  (real kleaf flag, THIN - flag alone insufficient), test-r12-ltonone-cfg
+  (0015+0016 LTO_NONE, halium) - kernel OK but CFI panics, test-los-pure
+  (no content patches, THIN), test-los-pure-ltonone (decider).
+  kernel-patches: halium-husky-ltonone (= halium-husky + 0015 gki_defconfig
+  LTO_NONE + 0016 halium.config LTO_NONE). device repo: same-name branches.
+- pstore captures: ~/bootdebug/pstore-ours-kernel.txt (CFI, thin),
+  pstore-ltonone.txt (CFI, LTO_NONE), pstore-decider*.txt (empty).
+- IKCONFIGs: ~/bootdebug/*-ikconfig.txt (r12, los, ltonone2, ltofinal).
+- Phone: LOS recovery, slot b.
+
+---
+
 ## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
 Kernel is NOT hanging - it PANICS at ~1.41s every boot:
   CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
