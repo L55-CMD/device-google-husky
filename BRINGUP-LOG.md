@@ -19,6 +19,21 @@
 
 ---
 
+## UPDATE 2026-11-04 ~13:30 UTC
+- gki_defconfig LTO_NONE append (aosp/0015) APPLIED in build but STILL THIN result:
+  build log shows '.config:7550:warning: override: LTO_CLANG_THIN changes choice state'
+  - a later merge stage re-asserts THIN after the defconfig. gki_defconfig has NO LTO
+  line of its own; olddefconfig alone would default the choice to THIN.
+- kleaf LTO mechanism FOUND (kernel/build @ 6b755daf, kleaf/BUILD.bazel): string_flag
+  //build/kernel/kleaf:lto (values default/none/fast/thin/full; 'default' = defconfig).
+  kernel_build(lto=...) selects lto_is_* config_settings. CORRECT FLAG:
+  tools/bazel run --//build/kernel/kleaf:lto=none --config=stamp --config=shusky       //private/devices/google/shusky:zuma_shusky_dist
+  Bare '--lto=none' is NOT a registered flag (silently ignored -> build still THIN).
+- NEW BUILD RUNNING: test-kernel-r12-lto-none with the correct flag (branch also keeps
+  0015 gki_defconfig LTO_NONE append - belt and suspenders).
+
+---
+
 ## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
 Kernel is NOT hanging - it PANICS at ~1.41s every boot:
   CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
