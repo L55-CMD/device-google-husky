@@ -51,6 +51,37 @@
 
 ---
 
+## UPDATE 2026-11-04 ~16:45 UTC
+- LTO_NONE kernel (verified CONFIG_LTO_NONE=y in IKCONFIG): SAME CFI panic.
+  LTO EXONERATED. Bogus target CHANGED between builds (etm2dram_probe ->
+  gsa_unlink_s2mpu), same expected type hash 0xd1c748b3 -> NONDETERMINISTIC
+  runtime corruption, not a link-time miscompile.
+- SOURCE-LEVEL MECHANISM (phy-exynos-usbdrd-eusb.c):
+  exynos_usbdrd_s2mpu_manual_control() reads static fn ptr 's2mpu_notify'
+  (NULL until exynos_usbdrd_set_s2mpu_pm_ops registers a callback; NULL path
+  is a graceful no-op). The pointer contains a LIVE address of ANOTHER
+  module's EXPORTED function (varies per build). Static .data initialized
+  NULL in the .ko -> runtime corruption = module loader symbol-resolution
+  writes landing in wrong slots (corrupted relocs/symtab in built .kos),
+  stomping that .data slot.
+- Config diff vs LOS kernel now down to: MODULE_SIG_PROTECT + halium features
+  only. Nothing CFI/reloc-relevant. Yet LOS nightly modules work.
+- DECIDER BUILD RUNNING: test-los-pure-ltonone (los-pure patch set - zero
+  halium content patches/config - PLUS kleaf lto=none). This is bit-for-bit
+  LOS's content+config+LTO built on OUR pipeline.
+  * crashes -> our kleaf/module post-processing pipeline corrupts modules
+    (compare strip/sign/compress steps vs LOS build; try module signing off,
+    strip variants, uncompressed modules)
+  * boots (to ~20s orderly shutdown as with LOS stack) -> halium PATCHES are
+    what breaks module relocation; bisect: 0001 (task_struct ABI padding)
+    first, then 0014 (binder/config), 0003 (protected modules)...
+- pstore capture (works reliably): our kernel + LOS vendor_boot + our
+  init_boot/vkb/dtbo -> boot (crash ~1.5s) -> full LOS stack -> recovery ->
+  cat /sys/fs/pstore/console-ramoops-0. Latest capture:
+  ~/bootdebug/pstore-ltonone.txt (3530 lines, 2 boots, same crash).
+
+---
+
 ## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
 Kernel is NOT hanging - it PANICS at ~1.41s every boot:
   CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
