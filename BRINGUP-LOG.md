@@ -152,6 +152,24 @@ Day 2 final state:
   boots -> old kleaf was the bug. If BOTH boot, main should take both fixes.
 ---
 
+## UPDATE 2026-11-04 ~21:25 UTC
+- test-r12-newkleaf (LOS-matched kleaf/prebuilts + halium LTO_NONE): FROZEN LOGO.
+  Kleaf version exonerated too.
+- test-r12-nocfi first build failed: with CFI off, halium.config's
+  CONFIG_CFI_PERMISSIVE=y becomes invalid -> kleaf fragment validation error.
+  Fixed via private/devices/0004 (drop CFI_PERMISSIVE), re-dispatched.
+- nocfi kernel = r12 + halium patches (THIN as upstream) + CFI_CLANG off.
+  If it boots -> CFI jump-table fixup was stomping module memory. If not,
+  remaining lead = GKI kernel image vs Google prebuilt GKI binary at runtime.
+- Config warning analysis from decider boot: LOS stack cmdline has
+  console=null/console=ttynull -> ramoops captures empty (no console output).
+  Explains 'invalid compression size 0' on decider captures: decider HUNG early
+  (no panic), not the same CFI crash. So unpatched+our-pipeline = EARLY HANG;
+  halium-patched = CFI PANIC at 1.4s. Two failure flavors, one suspect: our
+  GKI kernel build vs Google's prebuilt GKI binary.
+
+---
+
 ## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
 Kernel is NOT hanging - it PANICS at ~1.41s every boot:
   CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
