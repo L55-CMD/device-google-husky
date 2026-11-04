@@ -34,6 +34,23 @@
 
 ---
 
+## UPDATE 2026-11-04 ~15:10 UTC
+- ROOT CAUSE OF 'CONFIG_LTO_CLANG_THIN=y WON'T DIE': upstream UBports
+  arch/arm64/configs/halium.config (created by aosp/0002) contains
+  CONFIG_LTO_CLANG_THIN=y explicitly ('full LTO needs too much RAM').
+  It merges AFTER kleaf's lto=none fragment -> '.config: override:
+  LTO_CLANG_THIN changes choice state' -> final config THIN.
+  Evidence: build log action labels (halium.config;lto=none;trim) +
+  override warning in @//aosp GKI config INFO; shusky device config had
+  NO THIN warning but boot.img carries the GKI kernel (THIN).
+- FIX: aosp/0016-halium.config-use-LTO_NONE.patch (1-line-context hunk,
+  git apply --check verified locally). Branch halium-husky-ltonone now:
+  0015 (gki_defconfig LTO_NONE append) + 0016 (halium.config LTO_NONE).
+  Kernel build re-dispatched for test-r12-ltonone-cfg ~15:10 UTC.
+- Watcher note: background watchers die at 3600s; restart after.
+
+---
+
 ## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
 Kernel is NOT hanging - it PANICS at ~1.41s every boot:
   CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
