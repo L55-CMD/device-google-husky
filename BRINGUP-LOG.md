@@ -1,5 +1,24 @@
 # Husky bring-up log
 
+## UPDATE 2026-11-04 ~11:20 UTC
+- los-pure (STOCK LOS kernel content, zero halium patches/config) on our kleaf
+  pipeline: FROZEN LOGO. Halium patches/config EXONERATED as the CFI crash cause.
+  Delta vs working LOS nightly = our BUILD ENV. Prime suspect: thin LTO
+  (kleaf gki default; LOS builds LTO_NONE).
+- kleaf has NO --lto bazel flag at this revision (tools/bazel run --lto=none was
+  silently ignored; kernel still CONFIG_LTO_CLANG_THIN). LTO is controlled by
+  defconfig only.
+- NEW BUILD RUNNING: test-r12-ltonone-cfg (kernel-patches branch
+  halium-husky-ltonone = halium-husky + halium.config override:
+  '# CONFIG_LTO_CLANG_THIN is not set' + CONFIG_LTO_NONE=y).
+  VERIFY IKCONFIG LTO_NONE BEFORE FLASHING (lz4.exe -d + IKCFG_ST method).
+- CI gotcha: pushes to kernel-patches repo do NOT trigger kernel builds (manifest
+  repo workflow only) - re-dispatch workflow_dispatch manually after patch changes.
+- git tree API commits default files to 100644 - preserve 100755 for *.sh or CI
+  fails with Permission denied.
+
+---
+
 ## ROOT CAUSE FOUND (2026-11-04 ~10:05 UTC)
 Kernel is NOT hanging - it PANICS at ~1.41s every boot:
   CFI failure at exynos_usbdrd_s2mpu_manual_control+0x74 [phy_exynos_usbdrd_eusb_super]
