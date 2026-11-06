@@ -1,0 +1,39 @@
+From 5a54b36d0f5ee9198a57ab51de1b5f34c7a35ca1 Mon Sep 17 00:00:00 2021
+From: Luke <luke@localhost>
+Date: Fri, 6 Nov 2026 20:10:00 +0000
+Subject: [PATCH] system-image: disable ext4 shared_blocks feature
+
+e2fsprogs 1.47 (Ubuntu 24.04 CI hosts) enables the shared_blocks
+ro_compat feature by default. The Android 16 husky kernel refuses to
+mount the generated system image read-write with:
+
+  EXT4-fs (dm-0): couldn't mount RDWR because of unsupported optional
+  features (4000)
+
+Disable shared_blocks when creating rootfs.img so the Halium initrd can
+mount the Ubuntu Touch system partition.
+
+---
+ system-image-from-ota.sh | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/system-image-from-ota.sh b/system-image-from-ota.sh
+index 80430315cb97f1b87a3ecaa0a97b2e6a3f96ecbd..0000000000000000000000000000000000000000 100644
+--- a/system-image-from-ota.sh
++++ b/system-image-from-ota.sh
+@@ -86,7 +86,9 @@
+                     sector_size_arg=""
+                     # shellcheck disable=SC2154
+                     [ -n "$deviceinfo_rootfs_image_sector_size" ] && \
+                         sector_size_arg="-b $deviceinfo_rootfs_image_sector_size"
+
+-                    mkfs.ext4 -F $sector_size_arg "$OUT/rootfs.img"
++                    # e2fsprogs 1.47 enables shared_blocks by default; the
++                    # target kernel rejects read-write mounts of that feature.
++                    mkfs.ext4 -F $sector_size_arg -O ^shared_blocks "$OUT/rootfs.img"
+                     # Disable orphan_file as needed when host e2fsprogs 1.47+ would create something
+                     # incompatible with e2fsck 1.45 of UBports recovery breaking 20.04 OTA updates
+ 		    if dumpe2fs -h "$OUT/rootfs.img" | grep -q 'orphan_file'; then
+-- 
+2.48.1
+
