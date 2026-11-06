@@ -30,7 +30,7 @@ index 80430315cb97f1b87a3ecaa0a97b2e6a3f96ecbd..00000000000000000000000000000000
                      mkfs.ext4 -F $sector_size_arg "$OUT/rootfs.img"
 +                    # e2fsprogs 1.47 enables shared_blocks by default; the
 +                    # target kernel rejects read-write mounts of that feature.
-+                    tune2fs -O '^shared_blocks' "$OUT/rootfs.img"
++                    e2fsck -fy -E unshare_blocks "$OUT/rootfs.img"
                      # Disable orphan_file as needed when host e2fsprogs 1.47+ would create something
                      # incompatible with e2fsck 1.45 of UBports recovery breaking 20.04 OTA updates
  		    if dumpe2fs -h "$OUT/rootfs.img" | grep -q 'orphan_file'; then
