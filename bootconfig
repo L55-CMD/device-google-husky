@@ -1,1 +1,3 @@
 androidboot.boot_devices=13200000.ufs
+panic = 10
+softlockup_panic = 1

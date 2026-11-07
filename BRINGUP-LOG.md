@@ -1,5 +1,149 @@
 # Husky bring-up log
 
+## DAY 4 2026-11-07 ~08:15 UTC
+- Reflashed full `latest-test-r12-rootfsfix` (commit 0fdb15e; verified
+  sha256 2b9b27b5... for reassembled super.img). Boot: white logo ~2.5 min
+  -> self-reboot -> fastboot fallback. CONSISTENT with the known 6.349s
+  HSI0/S2MPU USB panic (panic -> reboot; slot never marked successful).
+- IKCFG re-verified on the flashed kernel: 6.1.145, CONFIG_ARM64_ERRATUM_4118414=y
+  (method: unpack boot.img -> kernel is LZ4 LEGACY frame -> ~/bin/lz4 -d -l,
+  then IKCFG_ST->IKCFG_ED region holds one gzip at +8, FLG has reserved bit so
+  parse manually; python zlib wbits=31 works on the region slice).
+- Device branch `test-r12-s2mpu-rtpm` created from test-r12-rootfsfix and PUSHED.
+  NOTE: push did NOT trigger build-final (paths filter should have matched
+  build-patches/**; GitHub never queued it) - dispatched manually with the
+  watch-ci.sh PAT: run 42354412758 (workflow_dispatch, in_progress 08:11 UTC).
+  Kernel dep: release tag test-r12-s2mpu-rtpm (kernel run 42301690735 SUCCESS).
+- NEXT: when run 42354412758 goes green, download latest-test-r12-s2mpu-rtpm
+  boot-images.zip + super.img.part-*, flash ALL incl. super (rootfsfix lives
+  there), boot, watch for ADB/Lomiri. If panic: pstore capture per day-3 method.
+
+## DAY 4 2026-11-07 ~09:00 UTC
+- s2mpu-rtpm device build: run 42354412758 SUCCESS -> release latest-test-r12-s2mpu-rtpm
+  (08:22). Full set flashed (boot stack 08:25 + super 08:29, sha256 9cac7a62...).
+- Boot 08:32: HOST SAW USB GADGET ENUMERATE ~08:47 (RNDIS 18D1:D001 + composite
+  4EE0/4EE2/4EE9 = MTP+ADB+MIDI) => kernel got PAST the 6.348s SysMMU USB panic -
+  the rtpm workaround WORKS at least intermittently. ~08:52 USB dropped and never
+  returned; no fastboot, no adb since. Phone presumed hung (at logo) or panic-looping
+  silently. pstore should hold the successful boot's full log (ramoops keeps last
+  flushed record) - CAPTURE IT when phone is back in fastboot.
+- HOST BLOCKER: this Windows box has NO adb/rndis driver bound and NO admin rights
+  (pnputil denied). Bootloader fastboot works (winusb.inf already bound to 4EE0).
+  Prep for user: elevated `pnputil /add-driver <usb_driver>/android_winusb.inf
+  /install` (already downloaded to C:\Users\lukes\AppData\Local\Temp\usb_driver)
+  then RNDIS binds automatically -> ssh/adb over 10.15.19.x possible.
+- Watcher logging phone state transitions: ~/bootdebug/day4/phone-state.log.
+- pstore.txt (rootfsfix era) re-analysis: deterministic 6.348s panic loop; ABL-side
+  DECON/panel (google-hk3 1344x2992) init seen in log is BL splash only.
+
+## DAY 4 EVENING 2026-11-07 ~19:45 UTC
+- Battery died while hung (black screen); pstore from the good 08:47 boot LOST
+  with DRAM power. User charged, back in fastboot.
+- RERUN of s2mpu-rtpm (boot stack reflashed, super unchanged): hung at logo ->
+  ABL fallback -> fastboot. INTERMITTENCY CONFIRMED: the rtpm variant wins the
+  S2MPU race only sometimes (when pkvm_s2mpu probed before dwc3 powers on).
+- Theory refined with both failure modes:
+  1. early: phy_drd->s2mpu still NULL at manual_control(true) -> silent no-op
+     -> SysMMU fault at 6.3s (matches ABL-fallback-after-hang today)
+  2. late: pm_runtime_suspend on off-path drops HSI0 translations mid-DMA
+     (matches 08:47 USB-up-then-dead-after-5min this morning)
+- FIX pushed as experiment test-r12-s2mpu-hold (kernel-patches 2d2e8ef,
+  manifest d967396, kernel CI run 42407513837): retry-loop ~4s for s2mpu link +
+  pm_runtime_resume_and_get held forever (off-path no-op). Device repo gets
+  bootconfig panic=10 + softlockup_panic=1 so future panics self-reboot.
+- Driver blocker SOLVED: user ran install-drivers.cmd (Google usb driver in
+  store as oem28.inf). adb/rndis should bind on next gadget enumeration.
+- device branch test-r12-s2mpu-hold to be pushed AFTER kernel release exists.
+
+### Day 4 next actions (ordered)
+1. Phone back in fastboot -> flash LOS stack from ~/husky-verify -> recovery ->
+   read pstore: how far did the s2mpu-rtpm boot get before dying?
+2. If user grants admin: install android_winusb.inf -> adb works -> much faster loop.
+3. Next kernel iteration depends on pstore contents. DRAFT ready (uncommitted)
+   in ~/kernel-patches-husky branch test-r12-s2mpu-hold: replaces suspend with
+   pm_runtime_resume_and_get held forever (off-path = no-op) - theory: the rtpm
+   variant's pm_runtime_suspend drops HSI0 translations while USB DMA is in
+   flight (UT re-enumerates gadget during boot) -> repeat SysMMU fault.
+4. Driver install for user (right-click as admin): ~/bootdebug/day4/install-drivers.cmd
+
+## HANDOVER 2026-11-06 ~22:40 UTC (day 3)
+STATUS: VERY CLOSE TO FIRST USERSPACE BOOT. The kernel now reaches Ubuntu Touch
+userspace; the temporary USB/S2MPU workaround is the last known boot blocker.
+
+### Verified today
+- `test-r12-nocfi` (CFI disabled): no readable pstore and no ADB/fastboot
+  recovery -> hang. CFI is not the root cause; it catches a real bad indirect
+  call.
+- `test-r12-nos2mpu` (S2MPU callback no-op): bypassed the original CFI panic
+  and reached the Halium initrd. First it exposed a rootfs failure:
+  `EXT4-fs (dm-0): couldn't mount RDWR because of unsupported optional
+  features (4000)` = ext4 `shared_blocks`, newly enabled by CI e2fsprogs 1.47.
+- Device branch `test-r12-rootfsfix` adds build-tools patch
+  `0002-system-image-disable-shared_blocks.patch`; final working operation is:
+  `e2fsck -fy -E unshare_blocks "$OUT/rootfs.img"` immediately after mkfs.
+  The first two patch iterations (`mke2fs -O ^shared_blocks`, then tune2fs)
+  failed in CI and should be squashed away before merging.
+- Combined no-S2MPU kernel + fixed super reached UT userspace. Pstore contains
+  running userspace tasks: `snapd`, `click`, `aa-clickhook`, `d-logind`.
+  It then panicked at 6.349s when USB gadget started:
+  `SysMMU READ PTW ACCESS FAULT from HSI0 ... at 0x0ffffe000`.
+  Save: `~/bootdebug/test-r12-rootfsfix/pstore.txt`.
+  CONCLUSION: `shared_blocks` fix is verified; no-S2MPU no-op is not viable
+  because S2MPU must be resumed/bypassed for HSI0 USB DMA.
+
+### Running overnight
+- kernel-patches branch `test-r12-s2mpu-rtpm` (commit 6edb872) replaces the
+  no-op with direct S2MPU runtime-PM calls in
+  `exynos_usbdrd_s2mpu_manual_control()`:
+  `pm_runtime_resume(phy_drd->s2mpu)` for on, `pm_runtime_suspend()` for off.
+  This avoids the corrupted `s2mpu_notify` cross-module function pointer without
+  skipping S2MPU configuration. Patch applies cleanly to lineage-23.2 source.
+- kernel manifest branch `test-r12-s2mpu-rtpm` (commit 7e27949) points at that
+  patch branch and was pushed at ~22:03 UTC.
+- Kernel CI run to check first: `42301690735`
+  (`lineage-kernel-manifest-husky`, branch `test-r12-s2mpu-rtpm`).
+  Last confirmed state ~22:31 UTC: `in_progress`. GitHub unauthenticated API
+  polling later hit 403/rate-limit; use an authenticated API call in the morning.
+
+### Tomorrow: next steps in order
+1. Check run `42301690735`. If green, download
+   `https://github.com/L55-CMD/lineage-kernel-manifest-husky/releases/download/test-r12-s2mpu-rtpm/kernel.zip`.
+2. Create/push device branch `test-r12-s2mpu-rtpm` from `test-r12-rootfsfix`
+   (so it includes the verified shared_blocks fix). Device CI will resolve the
+   same-name kernel release automatically and build boot images + super.
+3. Download `boot-images.zip` and all `super.img.part-*` from
+   `latest-test-r12-s2mpu-rtpm`; concatenate the super parts. Flash boot,
+   dtbo, init_boot, vendor_boot, vendor_kernel_boot, AND super. Super is
+   required: the rootfs fix lives there.
+4. Phone: serial 38111FDJG001WM, slot b, bootloader unlocked. If in recovery:
+   `adb reboot bootloader`. If frozen at logo: hold Power+VolUp+VolDown ~20s,
+   then Power+VolDown for fastboot.
+5. Boot and watch for ADB. Success means Lomiri/UT UI may appear; then run the
+   normal display/touch/WiFi/audio/sensor matrix from README.
+6. If it panics: pstore capture method is flash full LOS stack from
+   `~/husky-verify`, boot recovery, accept ADB, then
+   `adb shell cat /sys/fs/pstore/console-ramoops-0`.
+
+### Key paths/branches
+- Best evidence: `~/bootdebug/test-r12-rootfsfix/pstore.txt`
+  (UT userspace reached, then HSI0/S2MPU panic).
+- Device branch: `test-r12-rootfsfix` (contains shared_blocks fix; local branch
+  has the final e2fsck version; remote history may still show the two failed
+  iterations unless squashed/force-pushed).
+- Kernel branch: `test-r12-s2mpu-rtpm` in both `kernel-patches-husky` and
+  `lineage-kernel-manifest-husky`.
+- Local repos now have a `github` remote because old `origin` points at tegu.
+- `~/bootdebug/watch-ci.sh` contains a VALID classic PAT in plaintext. Revoke it
+  when this phase is done; do not paste it into chat.
+
+### Closeness estimate
+The OS is effectively one boot blocker away from a usable first UI: kernel,
+initrd, rootfs mount, and userspace startup are all proven. If runtime-PM
+S2MPU control works, remaining work is expected to shift from boot bring-up to
+device enablement/bug fixing (display, touch, WiFi, audio, sensors, USB).
+
+---
+
 ## UPDATE 2026-11-04 ~11:20 UTC
 - los-pure (STOCK LOS kernel content, zero halium patches/config) on our kleaf
   pipeline: FROZEN LOGO. Halium patches/config EXONERATED as the CFI crash cause.
