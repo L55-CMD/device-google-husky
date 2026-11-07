@@ -36,6 +36,38 @@
 - pstore.txt (rootfsfix era) re-analysis: deterministic 6.348s panic loop; ABL-side
   DECON/panel (google-hk3 1344x2992) init seen in log is BL splash only.
 
+## ROOT CAUSE + FIX 2026-11-07 ~22:15 UTC
+Full source-level analysis (LineageOS gs-6.1 trees) unified every symptom:
+
+1. exynos_usbdrd_phy_probe (eusb.c) resolves phy_drd->s2mpu via the
+   "s2mpus" phandle AT PROBE TIME. If the phy probes before pkvm-s2mpu
+   registers its platform device -> s2mpu_pdev = NULL -> phy_drd->s2mpu
+   NULL FOREVER (never re-attempted). All exynos_usbdrd_s2mpu_manual_control()
+   calls then silently no-op -> S2MPU never switched to allow-all ->
+   HSI0 SysMMU PTW ACCESS FAULT at first USB gadget DMA -> panic.
+   INTERMITTENT by module load order (uevents vs LOS init.insmod order):
+   explains 08:47 success vs evening failures with identical images.
+2. All "nvhe" CI boots were truly nvhe (last cmdline occurrence wins;
+   el2-module lines absent; pstore shows "pKVM disabled, control from
+   kernel"). Under nvhe __pkvm_s2mpu_resume writes the allow-all bypass
+   register directly (S2MPU_V9 CTRL_PROT_EN_PER_VID_CLR) - fine.
+3. The day-2/3 "garbage CFI pointer" (target etm2dram_probe) was a
+   DANGLING s2mpu_notify: protected-mode experiments made pkvm_s2mpu
+   module init fail (el2 load -95) AFTER set_s2mpu_pm_ops succeeded ->
+   module unloaded -> static pointer into freed module memory reused by
+   etm2dram. Not a build/CFI-type issue.
+4. pm_runtime workaround patches (rtpm/hold) couldn't work: they sat on
+   the same possibly-NULL phy_drd->s2mpu, and pm_runtime_resume !=
+   __pkvm_s2mpu_resume when runtime PM disabled/not-enabled path taken.
+
+FIX = single hunk in phy probe: return -EPROBE_DEFER when the s2mpu
+platform device is not yet registered (driver core re-probes later).
+Stock manual_control path restored; workarounds deleted.
+
+Experiment test-r12-phydefer: kernel-patches 4cbfc29, manifest 531bd4d,
+kernel CI run 42417595737. Device branch to follow (from s2mpu-hold:
+keeps rootfsfix + panic=10 bootconfig).
+
 ## DAY 4 EVENING 2026-11-07 ~19:45 UTC
 - Battery died while hung (black screen); pstore from the good 08:47 boot LOST
   with DRAM power. User charged, back in fastboot.
