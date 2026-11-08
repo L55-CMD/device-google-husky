@@ -23,6 +23,20 @@
 - Also ruled out today: /dev/mem shortcut (CONFIG_DEVMEM not set), and
   the non-super phy-exynos-usbdrd.c symbol collision (not built on zuma;
   zuma_defconfig has only CONFIG_PHY_EXYNOS_USBDRD_EUSB=m).
+- HANG DIAGNOSIS CATCH-22 SOLVED: hangs can only be escaped by hard
+  button-reset, which DESTROYS ramoops (DRAM lost). Panics survive (soft
+  reboot, panic=10). Fix: initrd arms hung_task_panic=1 @60s (sysctl
+  exists; the bootparam variant is compiled out but sysctl works), so a
+  D-state hang self-panics cleanly; PLUS an initrd 'black box' appends
+  the previous boot's entire pstore to /husky-blackbox.log on USERDATA
+  (flash) every boot - survives hard resets, readable by mounting
+  userdata from recovery. Built in run after 22f74ea (test-r12-lazylink).
+- LAZYLINK BOOT RESULT: kernel patches eliminated the panic loop
+  entirely (no SysMMU fault, no CFI trip, stable white logo 5+ min) but
+  the boot now hangs LATER with zero USB (no adb/rndis/gadget on host).
+  Nov-6 rootfsfix reached userspace with same super content, so this is a
+  new later-phase hang - probably userspace/USB-gadget/display. Hung-task
+  panic + blackbox will capture exactly where.
 - ROOT CAUSE UPGRADE (2026-11-08 ~13:00 UTC): instrumented initrd pstore
   capture showed the quickload boot died differently - CFI fatal in
   exynos_usbdrd_s2mpu_manual_control called from exynos-pd kworker, call
