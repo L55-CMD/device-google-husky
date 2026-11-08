@@ -660,10 +660,15 @@ mountroot() {
 	# setup super partition if exists
 	if [ -n "/dev/disk/by-partlabel/super" ]; then
 		tell_kmsg "trying to parse and dmsetup subpartitions from super partition"
-		/sbin/parse-android-dynparts /dev/disk/by-partlabel/super | sh
-		dmsetup mknodes
-		qlprog "post-dynparts mapper=[$(ls /dev/mapper/ 2>/dev/null | tr "
-" ",")]"
+		qlprog "pre-dynparts"
+		timeout 15 /sbin/parse-android-dynparts /dev/disk/by-partlabel/super > /run/dynparts.out 2>&1
+		qlprog "parse rc=$? bytes=$(wc -c < /run/dynparts.out 2>/dev/null)"
+		sh /run/dynparts.out
+		qlprog "dm-create rc=$?"
+		timeout 15 dmsetup mknodes
+		qlprog "mknodes rc=$?"
+		qlprog "post-dynparts mapper=[$(ls /dev/mapper/ 2>/dev/null | tr '
+' ',')]"
 	fi
 
 	# Set $_syspart if it is specified as systempart= on the command line
