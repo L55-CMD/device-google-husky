@@ -9,13 +9,6 @@ pre_mountroot() {
 	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-top"
 	run_scripts /scripts/local-top
 	[ "$quiet" != "y" ] && log_end_msg
-	qlprog "mountroot-done (pivot next)"
-	{
-		echo "=== QL stage final $(date -u +%H:%M:%S) ==="
-		cat /run/ql-progress 2>/dev/null
-		echo "--- dmesg tail at pivot ---"
-		dmesg | tail -150
-	} >> /tmpmnt/husky-blackbox.log 2>/dev/null
 }
 
 tell_kmsg() {
@@ -669,6 +662,8 @@ mountroot() {
 		tell_kmsg "trying to parse and dmsetup subpartitions from super partition"
 		/sbin/parse-android-dynparts /dev/disk/by-partlabel/super | sh
 		dmsetup mknodes
+		qlprog "post-dynparts mapper=[$(ls /dev/mapper/ 2>/dev/null | tr "
+" ",")]"
 	fi
 
 	# Set $_syspart if it is specified as systempart= on the command line
@@ -690,7 +685,9 @@ mountroot() {
 		fi
 	fi
 
+	qlprog "pre-identify-layout"
 	identify_file_layout
+	qlprog "post-layout imagefile=[$imagefile]"
 
 	# Default to /dev/mapper/system if no image file is found
 	[ -z "$imagefile" ] && [ -z "$_syspart" ] && _syspart=/dev/mapper/system
@@ -716,6 +713,7 @@ mountroot() {
 
 	mkdir -p /halium-system
 
+	qlprog "pre-rootfs-mount syspart=$_syspart opts=$_syspart_options"
 	tell_kmsg "mounting system rootfs at /halium-system"
 	if [ -n "$_syspart" ]; then
 		mount -o "$_syspart_options" $_syspart /halium-system
@@ -751,6 +749,7 @@ mountroot() {
 		mount -o remount,ro /halium-system
 		mountroot_status="$?"
 	fi
+	qlprog "rootfs-mounted status=$mountroot_status"
 
 	# Mount the android system partition to a temporary location
 	MOUNT="ro"
@@ -769,6 +768,7 @@ mountroot() {
 	fi
 
 	[ $? -eq 0 ] || tell_kmsg "WARNING: Failed to mount Android system.img."
+	qlprog "android-image-mounted"
 
 	[ $ANDROID_IMAGE_MODE = "rootfs" ] && mount -o bind $MOUNT_LOCATION/system /android-system
 	[ $ANDROID_IMAGE_MODE = "system" ] && extract_android_ramdisk
@@ -821,6 +821,7 @@ mountroot() {
 	elif [ -e $imagefile ] || [ -n "$_syspart" ]; then
 		# Regular image boot
 		tell_kmsg "Normal boot"
+		qlprog "normal-boot-branch"
 
 		mount --move /halium-system ${rootmnt}
 		mkdir -p ${rootmnt}/android
@@ -901,4 +902,15 @@ mountroot() {
 	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-bottom"
 	run_scripts /scripts/local-bottom
 	[ "$quiet" != "y" ] && log_end_msg
+	qlprog "mountroot-done (pivot next)"
+	{
+		echo "=== QL stage final $(date -u +%H:%M:%S) ==="
+		cat /run/ql-progress 2>/dev/null
+		echo "--- /dev/mapper ---"
+		ls -la /dev/mapper/ 2>/dev/null
+		echo "--- partitions ---"
+		tail -15 /proc/partitions 2>/dev/null
+		echo "--- dmesg tail at pivot ---"
+		dmesg | tail -150
+	} >> /tmpmnt/husky-blackbox.log 2>/dev/null
 }
