@@ -23,6 +23,29 @@
 - Also ruled out today: /dev/mem shortcut (CONFIG_DEVMEM not set), and
   the non-super phy-exynos-usbdrd.c symbol collision (not built on zuma;
   zuma_defconfig has only CONFIG_PHY_EXYNOS_USBDRD_EUSB=m).
+- ROOT CAUSE UPGRADE (2026-11-08 ~13:00 UTC): instrumented initrd pstore
+  capture showed the quickload boot died differently - CFI fatal in
+  exynos_usbdrd_s2mpu_manual_control called from exynos-pd kworker, call
+  target = fips140 module memory. Mechanism: set_s2mpu_pm_ops() publishes
+  s2mpu_pm_control into a RAW STATIC POINTER in the phy module with ZERO
+  lifetime management. Load order: samsung_iommu_v9 fails (1.17s, pkvm not
+  loaded yet) -> hook loads pkvm-s2mpu-v9 (1.45s, notify set, refcount 0)
+  -> loop retries samsung_iommu_v9, fails again -> modprobe failure cleanup
+  UNLOADS pkvm-s2mpu-v9 (zero refcount dep) -> notify dangles -> pd-hsi0
+  power-on post (kworker) calls it -> CFI fatal (fips140 reused the memory).
+  SAME FAMILY as day-2/3 'garbage CFI pointer' (etm2dram). THE S2MPU NOTIFY
+  POINTER IS THE WHOLE BUG: NULL link -> SysMMU fault; dangling pointer ->
+  CFI fatal; both intermittent by module load timing.
+- FIX (test-r12-lazylink, pushed): 0002 lazy link resolution (both failure
+  modes of the NULL link) + 0003 __module_get(THIS_MODULE) self-pin in
+  pkvm_s2mpu mod_init after successful registration (notify can never
+  dangle again). Device-side quickload preload ABANDONED - it caused the
+  unload race it tried to fix; with the kernel patches any module order
+  works.
+- Also captured: kernel cmdline has kvm-arm.protected_modules=
+  exynos-pd,pkvm_s2mpu-v9 and *.load_sequential=1 (stock Pixel bootconfig);
+  'Failed to load pkvm module exynos-pd: 11' at 0.24s is the kernel-side
+  protected-module preload failing pre-initrd - harmless, initrd reloads.
 - RETRY-COUNTER POISONING (major methodology lesson): ABL slot-retry-count
   had decremented to 1 across the day's failed boots; afterwards every boot
   attempt showed 'logo briefly -> fastboot' which LOOKED like instant ABL
