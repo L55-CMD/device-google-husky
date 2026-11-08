@@ -1,5 +1,31 @@
 # Husky bring-up log
 
+## DAY 5 2026-11-08 ~10:45 UTC
+- phydefer (EPROBE_DEFER in phy probe) EMPIRICALLY WORSE: boot -> zero USB
+  enumeration at all (no gadget, no fastboot flap, stable white logo; host
+  PnP clean). Two boots identical. The phy never re-probes after defer.
+  Lesson: do not rely on driver-core re-probe; keep probe 100% stock.
+- GROUND TRUTH from nos2mpu pstore: initrd module order is SEQUENTIAL
+  modprobe over modules.load, and the list has
+  phy-exynos-usbdrd-eusb-super at ~1.58s BEFORE pkvm-s2mpu-v9 at ~1.89s
+  (209 entries). Intermittency = whether the phy's probe deferred at its
+  slot (pd-hsi0 state), not list order (fixed per image).
+- QUICKLOAD EXPERIMENT (device repo only, d536fae on test-r12-rootfsfix):
+  halium init script preloads pkvm-s2mpu-v9 (modprobe, deps auto) ahead
+  of the modules.load loop. Tests load-order theory on the STOCK-s2mpu
+  r12 kernel (~15 min CI, no kernel rebuild). Device CI run 42473851840.
+- Kernel-side robust fix prepared (not pushed): test-r12-lazylink in
+  kernel-patches (73ef7d1) + manifest (71ea960): resolve phy_drd->s2mpu
+  lazily in manual_control() AND in exynos_usbdrd_set_s2mpu_pm_ops()
+  (called from pkvm_s2mpu probe -> device guaranteed to exist). Validated
+  vs CI apply path (git am --3way simulation OK). Belt+suspenders for
+  post-merge regardless of quickload outcome.
+- Also ruled out today: /dev/mem shortcut (CONFIG_DEVMEM not set), and
+  the non-super phy-exynos-usbdrd.c symbol collision (not built on zuma;
+  zuma_defconfig has only CONFIG_PHY_EXYNOS_USBDRD_EUSB=m).
+- HOST DRIVER BLOCKER GONE: adb works (LOS recovery enumerated, adb
+  authorized). Fastboot+adb+PnP all verified today.
+
 ## UPDATE 2026-11-04 ~11:20 UTC
 - los-pure (STOCK LOS kernel content, zero halium patches/config) on our kleaf
   pipeline: FROZEN LOGO. Halium patches/config EXONERATED as the CFI crash cause.
