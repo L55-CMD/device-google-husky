@@ -1,5 +1,26 @@
 # Husky bring-up log
 
+## DAY 5 late additions (~22:00 UTC)
+
+- **adb watch false positive**: `adb devices` output always contains the header
+  "List of devices attached" -- grep for "device" matches it. Watch loops must grep
+  for a device serial / state token, never the word "device". An "adb=1" report from
+  these loops was bogus.
+- **pstore is empty after hung-task panics** (3x confirmed: mount rc=0, dir empty).
+  Likely mechanism: the hung task holds a lock the panic dump path needs; the 10s
+  panic_timeout fires mid-dump and the reboot lands with nothing written. Short clean
+  panics (SysMMU at 6.4s) always wrote fine. Do not expect pstore after hangs.
+- **UT userdata layout**: `system-data/{etc,nix,opt,root,snap,var}` -- there is NO
+  `system-data/writable/`. UT's /etc/writable is a different mechanism. Any flash-
+  resident diagnostics must write to the partition root or self-mount.
+- **qlprog design** (build 7d37e7a): per-stage markers from the DYING boot itself,
+  appended to /husky-blackbox.log on userdata (survives hard resets). Stages:
+  mountroot-entry, pre/post-fsck (with duration), userdata-mounted, post-modules,
+  mountroot-done + dmesg tails at each. Systemd logger self-mounts userdata at
+  /mnt/husky-dbg. The last QL-PROG line in the black box names the hang stage.
+- **release-publish flake**: `gh release create` step intermittently fails after a
+  successful build (~1 in 3 lately). Just re-run failed jobs; the build is fine.
+
 ## HANDOVER 2026-11-08 ~19:45 UTC (day 5)
 STATUS: the 6.4s boot blocker is FIXED in the kernel (test-r12-lazylink:
 lazy s2mpu link + pkvm-s2mpu self-pin). Boots now run PAST the old panic
