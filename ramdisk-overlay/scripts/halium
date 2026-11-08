@@ -585,6 +585,19 @@ mountroot() {
 	[ `blkid $path -o value -s TYPE` = "ext4" ] && OPTIONS="data=journal,"
 	mount -o discard,$OPTIONS $path /tmpmnt
 
+	# Husky bring-up black box: persist the previous boot's pstore (panic
+	# dumps, console tail) onto userdata. Survives hard resets, readable
+	# from recovery by mounting userdata. Fed by hung_task_panic reboots.
+	{
+		echo "=== QL blackbox append, boot after clean-panic ==="
+		ls /sys/fs/pstore/ 2>&1
+		for f in /sys/fs/pstore/console-ramoops-0 /sys/fs/pstore/dmesg-ramoops-0 /sys/fs/pstore/pmsg-ramoops-0; do
+			echo "--- $f ---"
+			cat "$f" 2>/dev/null | tail -300
+		done
+	} >> /tmpmnt/husky-blackbox.log 2>/dev/null
+	echo "QL: blackbox appended: $(ls -la /tmpmnt/husky-blackbox.log 2>&1)" > /dev/pmsg0 2>/dev/null || true
+
 	# setup super partition if exists
 	if [ -n "/dev/disk/by-partlabel/super" ]; then
 		tell_kmsg "trying to parse and dmsetup subpartitions from super partition"
