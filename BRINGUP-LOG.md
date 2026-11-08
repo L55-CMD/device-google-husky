@@ -23,6 +23,15 @@
 - Also ruled out today: /dev/mem shortcut (CONFIG_DEVMEM not set), and
   the non-super phy-exynos-usbdrd.c symbol collision (not built on zuma;
   zuma_defconfig has only CONFIG_PHY_EXYNOS_USBDRD_EUSB=m).
+- BLACKBOX v1 RESULT (6 appends, all empty): the initrd blackbox ran
+  during the panic loop but captured nothing - /sys/fs/pstore was never
+  MOUNTED in the initrd (pstore is a separate fs; sysfs only provides the
+  mountpoint). Added mount + rc/dir logging (d442d17). Also learned:
+  recovery adb pull needs MSYS_NO_PATHCONV=1 for absolute unix paths.
+- Power-button liveness test: during the hang, a short power press turns
+  the screen off/on -> kernel + input are ALIVE -> soft hang (not a hard
+  freeze). hung_task_panic later fires (phone eventually lands in
+  fastboot after retries exhaust), so the stuck task is D-state.
 - HANG DIAGNOSIS CATCH-22 SOLVED: hangs can only be escaped by hard
   button-reset, which DESTROYS ramoops (DRAM lost). Panics survive (soft
   reboot, panic=10). Fix: initrd arms hung_task_panic=1 @60s (sysctl
