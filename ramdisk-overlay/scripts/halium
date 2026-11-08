@@ -625,10 +625,13 @@ mountroot() {
 	# Husky bring-up black box: persist the previous boot's pstore (panic
 	# dumps, console tail) onto userdata. Survives hard resets, readable
 	# from recovery by mounting userdata. Fed by hung_task_panic reboots.
-	mount -t pstore pstore /sys/fs/pstore 2>/dev/null || true
 	{
-		echo "=== QL blackbox append, boot after clean-panic ==="
-		ls /sys/fs/pstore/ 2>&1
+		echo "=== QL blackbox append ==="
+		echo "QL: mounts-before: $(cat /proc/mounts | grep -c pstore)"
+		mount -t pstore pstore /sys/fs/pstore
+		echo "QL: pstore-mount rc=$?"
+		echo "QL: mounts-after: $(cat /proc/mounts | grep pstore)"
+		echo "QL: pstore-dir: $(ls -la /sys/fs/pstore/ 2>&1)"
 		for f in /sys/fs/pstore/console-ramoops-0 /sys/fs/pstore/dmesg-ramoops-0 /sys/fs/pstore/pmsg-ramoops-0; do
 			echo "--- $f ---"
 			cat "$f" 2>/dev/null | tail -300
