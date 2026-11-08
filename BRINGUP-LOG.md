@@ -23,6 +23,21 @@
 - Also ruled out today: /dev/mem shortcut (CONFIG_DEVMEM not set), and
   the non-super phy-exynos-usbdrd.c symbol collision (not built on zuma;
   zuma_defconfig has only CONFIG_PHY_EXYNOS_USBDRD_EUSB=m).
+- RETRY-COUNTER POISONING (major methodology lesson): ABL slot-retry-count
+  had decremented to 1 across the day's failed boots; afterwards every boot
+  attempt showed 'logo briefly -> fastboot' which LOOKED like instant ABL
+  rejection but was the normal ~6.4s SysMMU panic + ABL parking in fastboot
+  after retries. ALWAYS check `getvar slot-retry-count` before diagnosing;
+  `set_active a && set_active b` resets it.
+- Console-ramoops wraps: the 6.4s panic's huge stack dumps overwrite the
+  1.5-2.5s module-loading window in the 100KB console zone, so initrd debug
+  (kmsg) is unrecoverable from pstore. pstore-pmsg (/dev/pmsg0) is the
+  answer: CONFIG_PSTORE_PMSG=y in our kernel, separate zone, survives panic.
+- Instrumented initrd (a4ec1ae): hook logs every step to /dev/pmsg0. CI
+  build 42480936012. Local cpio-surgery repack of init_boot produced a
+  structurally valid image but the phone's pstore ended up EMPTY afterwards
+  (nonstandard header in CI-built images: ramdisk size lives at 0x0C, not
+  the standard 0x10) - do not hand-repack boot images for this pipeline.
 - HOST DRIVER BLOCKER GONE: adb works (LOS recovery enumerated, adb
   authorized). Fastboot+adb+PnP all verified today.
 
