@@ -9,11 +9,27 @@ pre_mountroot() {
 	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-top"
 	run_scripts /scripts/local-top
 	[ "$quiet" != "y" ] && log_end_msg
+	qlprog "mountroot-done (pivot next)"
+	{
+		echo "=== QL stage final $(date -u +%H:%M:%S) ==="
+		cat /run/ql-progress 2>/dev/null
+		echo "--- dmesg tail at pivot ---"
+		dmesg | tail -150
+	} >> /tmpmnt/husky-blackbox.log 2>/dev/null
 }
 
 tell_kmsg() {
 	# Echos a string into /dev/kmsg, ignoring errors.
 	echo "initrd: $1" >/dev/kmsg || true
+}
+
+# husky bring-up: persistent per-boot progress log.  Every stage marker is
+# appended to /run/ql-progress (tmpfs) and flushed to the userdata black box
+# as soon as it is mounted; later stages append directly.  Survives panics
+# and hard resets (flash-resident), unlike pstore.
+qlprog() {
+	echo "QL-PROG[$(cut -d' ' -f1 /proc/uptime 2>/dev/null)]: $*" >> /run/ql-progress 2>/dev/null
+	echo "QL-PROG: $*" > /dev/pmsg0 2>/dev/null || true
 }
 
 halium_panic() {
@@ -494,6 +510,7 @@ mountroot() {
 	echo 1 > /proc/sys/kernel/hung_task_panic 2>/dev/null || true
 	{ echo "QL: hung_task_panic=$(cat /proc/sys/kernel/hung_task_panic 2>&1) timeout=$(cat /proc/sys/kernel/hung_task_timeout_secs 2>&1)"; } > /dev/pmsg0 2>/dev/null || true
 	pre_mountroot
+	qlprog "mountroot-entry"
 
 	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-premount"
 	run_scripts /scripts/local-premount
@@ -605,12 +622,14 @@ mountroot() {
 	# Mounting and umounting first, let the kernel handle the journal and
 	# orphaned inodes (faster than e2fsck). Then, just run e2fsck forcing -y.
 	# Also check the amount of time used by to check the filesystem.
+	qlprog "pre-fsck $path"
 	fsck_start=$(date +%s)
 	mount -o errors=remount-ro $path /tmpmnt
 	umount /tmpmnt
 	e2fsck -y $path >/run/e2fsck.out 2>&1
 	fsck_end=$(date +%s)
 	tell_kmsg "checking filesystem for userdata took (including e2fsck) $((fsck_end - fsck_start)) seconds"
+	qlprog "post-fsck $((fsck_end - fsck_start))s"
 
 	resize_userdata_if_needed ${path}
 
@@ -624,14 +643,20 @@ mountroot() {
 	# Husky bring-up black box: persist the previous boot's pstore (panic
 	# dumps, console tail) onto userdata. Survives hard resets, readable
 	# from recovery by mounting userdata. Fed by hung_task_panic reboots.
-	{ echo "=== husky initrd snap $(date) ==="; dmesg | tail -300; } > /tmpmnt/system-data/writable/husky-console-initrd.snap 2>/dev/null
+	qlprog "post-modules"
+	{ echo "=== husky initrd snap $(date) ==="; dmesg | tail -300; } > /tmpmnt/husky-console-initrd.snap 2>/dev/null
+	qlprog "userdata-mounted"
 	{
-		echo "=== QL blackbox append ==="
-		echo "QL: mounts-before: $(cat /proc/mounts | grep -c pstore)"
-		mount -t pstore pstore /sys/fs/pstore
-		echo "QL: pstore-mount rc=$?"
-		echo "QL: mounts-after: $(cat /proc/mounts | grep pstore)"
-		echo "QL: pstore-dir: $(ls -la /sys/fs/pstore/ 2>&1)"
+		echo "=== QL boot $(date -u +%H:%M:%S) ==="
+		echo "--- ql-progress so far ---"
+		cat /run/ql-progress 2>/dev/null
+		echo "--- e2fsck.out tail ---"
+		tail -40 /run/e2fsck.out 2>/dev/null
+		echo "--- dmesg tail at mountroot ---"
+		dmesg | tail -120
+		echo "--- pstore ---"
+		mount -t pstore pstore /sys/fs/pstore 2>/dev/null
+		echo "pstore-mount rc=$?"
 		for f in /sys/fs/pstore/console-ramoops-0 /sys/fs/pstore/dmesg-ramoops-0 /sys/fs/pstore/pmsg-ramoops-0; do
 			echo "--- $f ---"
 			cat "$f" 2>/dev/null | tail -300
