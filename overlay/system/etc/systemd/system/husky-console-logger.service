@@ -1,0 +1,17 @@
+[Unit]
+Description=Husky console snapshot logger (flash-resident diagnostics)
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c '\
+  OUT=/etc/writable/husky-console.snap; \
+  for i in $(seq 1 30); do [ -d /etc/writable ] && break; sleep 2; done; \
+  while :; do \
+    { echo "=== husky snap $(date) ==="; dmesg | tail -250; echo "--- ps ---"; ps; } > "$OUT.tmp" 2>&1 && mv "$OUT.tmp" "$OUT"; \
+    sleep 12; \
+  done'
+
+[Install]
+WantedBy=sysinit.target

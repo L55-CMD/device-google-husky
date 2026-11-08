@@ -484,9 +484,27 @@ mountroot() {
 	# list of possible userdata partition names
 	partlist="userdata UDA DATAFS USERDATA"
 
-	# Husky user-signal helpers: visible/audible boot progress that does
-	# not depend on pstore (lost on hard reset). Signals: backlight blinks
-	# + vibrator pulses, count = stage.
+	# Husky user-signal helpers are set up AFTER the module loop (drivers
+	# do not exist yet at mountroot-start).
+	echo "QL: mountroot-start" > /dev/pmsg0 2>/dev/null || true
+	# Arm the hung-task detector so a stuck boot self-panics (panic=10)
+	# instead of hanging forever - a clean panic preserves pstore, a hard
+	# button-reset destroys it.
+	echo 60 > /proc/sys/kernel/hung_task_timeout_secs 2>/dev/null || true
+	echo 1 > /proc/sys/kernel/hung_task_panic 2>/dev/null || true
+	{ echo "QL: hung_task_panic=$(cat /proc/sys/kernel/hung_task_panic 2>&1) timeout=$(cat /proc/sys/kernel/hung_task_timeout_secs 2>&1)"; } > /dev/pmsg0 2>/dev/null || true
+	pre_mountroot
+
+	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-premount"
+	run_scripts /scripts/local-premount
+	[ "$quiet" != "y" ] && log_end_msg
+
+	# Put all of this script's output into /dev/kmsg
+	exec &>/dev/kmsg
+
+	load_kernel_modules
+	echo "QL: modules-done" > /dev/pmsg0 2>/dev/null || true
+	# detect output devices now that modules are loaded, then signal
 	QLVIB=""
 	for _v in /sys/class/timed_output/vibrator/enable /sys/devices/virtual/timed_output/vibrator/enable /sys/class/leds/vibrator/activate; do
 		[ -e "$_v" ] && QLVIB="$_v" && break
@@ -508,25 +526,6 @@ mountroot() {
 		done
 	}
 	echo "QL: vib=$QLVIB bl=$QLBL" > /dev/pmsg0 2>/dev/null || true
-	qlsig 1
-	echo "QL: mountroot-start" > /dev/pmsg0 2>/dev/null || true
-	# Arm the hung-task detector so a stuck boot self-panics (panic=10)
-	# instead of hanging forever - a clean panic preserves pstore, a hard
-	# button-reset destroys it.
-	echo 60 > /proc/sys/kernel/hung_task_timeout_secs 2>/dev/null || true
-	echo 1 > /proc/sys/kernel/hung_task_panic 2>/dev/null || true
-	{ echo "QL: hung_task_panic=$(cat /proc/sys/kernel/hung_task_panic 2>&1) timeout=$(cat /proc/sys/kernel/hung_task_timeout_secs 2>&1)"; } > /dev/pmsg0 2>/dev/null || true
-	pre_mountroot
-
-	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-premount"
-	run_scripts /scripts/local-premount
-	[ "$quiet" != "y" ] && log_end_msg
-
-	# Put all of this script's output into /dev/kmsg
-	exec &>/dev/kmsg
-
-	load_kernel_modules
-	echo "QL: modules-done" > /dev/pmsg0 2>/dev/null || true
 	qlsig 2
 	# If no UDC appeared, the phy probe likely deferred on pd-hsi0 and
 	# nothing retried it (stock zuma defer race): bounce the phy module.
@@ -625,6 +624,7 @@ mountroot() {
 	# Husky bring-up black box: persist the previous boot's pstore (panic
 	# dumps, console tail) onto userdata. Survives hard resets, readable
 	# from recovery by mounting userdata. Fed by hung_task_panic reboots.
+	{ echo "=== husky initrd snap $(date) ==="; dmesg | tail -300; } > /tmpmnt/system-data/writable/husky-console-initrd.snap 2>/dev/null
 	{
 		echo "=== QL blackbox append ==="
 		echo "QL: mounts-before: $(cat /proc/mounts | grep -c pstore)"
