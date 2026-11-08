@@ -1,0 +1,18 @@
+[Unit]
+Description=Husky bring-up boot trace (pstore-pmsg)
+DefaultDependencies=no
+Before=basic.target
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '\
+  echo "QL-TRACE: sysinit reached" > /dev/pmsg0 && \
+  dmesg | tail -80 > /dev/pmsg0 && \
+  echo "QL-TRACE: udc: $(ls /sys/class/udc/ 2>&1)" > /dev/pmsg0 && \
+  cat /sys/class/udc/*/state > /dev/pmsg0 2>&1 && \
+  echo "QL-TRACE: end-sysinit" > /dev/pmsg0'
+
+[Install]
+WantedBy=sysinit.target

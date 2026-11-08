@@ -1,0 +1,16 @@
+[Unit]
+Description=Husky bring-up boot trace final (pstore-pmsg)
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '\
+  echo "QL-TRACE: multi-user reached" > /dev/pmsg0 && \
+  dmesg | tail -120 > /dev/pmsg0 && \
+  echo "QL-TRACE: ip:" > /dev/pmsg0 && \
+  ip addr > /dev/pmsg0 2>&1 && \
+  echo "QL-TRACE: end-multi-user" > /dev/pmsg0'
+
+[Install]
+WantedBy=multi-user.target

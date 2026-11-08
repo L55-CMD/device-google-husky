@@ -484,6 +484,7 @@ mountroot() {
 	# list of possible userdata partition names
 	partlist="userdata UDA DATAFS USERDATA"
 
+	echo "QL: mountroot-start" > /dev/pmsg0 2>/dev/null || true
 	pre_mountroot
 
 	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-premount"
@@ -494,9 +495,11 @@ mountroot() {
 	exec &>/dev/kmsg
 
 	load_kernel_modules
+	echo "QL: modules-done" > /dev/pmsg0 2>/dev/null || true
 	{ echo "QL: loaded-modules:"; grep -E "s2mpu|usbdrd|dwc3|samsung_iommu" /proc/modules; } > /dev/pmsg0 2>/dev/null || true
 	tell_kmsg "Finished loading kernel modules"
 	sleep 1
+	echo "QL: post-sleep" > /dev/pmsg0 2>/dev/null || true
 
 	# busybox mdev -s
 	# udevadm trigger
