@@ -485,6 +485,12 @@ mountroot() {
 	partlist="userdata UDA DATAFS USERDATA"
 
 	echo "QL: mountroot-start" > /dev/pmsg0 2>/dev/null || true
+	# Arm the hung-task detector so a stuck boot self-panics (panic=10)
+	# instead of hanging forever - a clean panic preserves pstore, a hard
+	# button-reset destroys it.
+	echo 60 > /proc/sys/kernel/hung_task_timeout_secs 2>/dev/null || true
+	echo 1 > /proc/sys/kernel/hung_task_panic 2>/dev/null || true
+	{ echo "QL: hung_task_panic=$(cat /proc/sys/kernel/hung_task_panic 2>&1) timeout=$(cat /proc/sys/kernel/hung_task_timeout_secs 2>&1)"; } > /dev/pmsg0 2>/dev/null || true
 	pre_mountroot
 
 	[ "$quiet" != "y" ] && log_begin_msg "Running /scripts/local-premount"
