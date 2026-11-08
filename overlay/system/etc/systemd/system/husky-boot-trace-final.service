@@ -13,7 +13,11 @@ ExecStart=/bin/sh -c '\
   echo "QL-TRACE: end-multi-user" > /dev/pmsg0 && \
   for fb in /dev/fb0 /dev/graphics/fb0; do [ -e "$fb" ] && dd if=/dev/urandom of="$fb" bs=1M count=16 >/dev/null 2>&1 && break; done; \
   V=""; for c in /sys/class/timed_output/vibrator/enable /sys/devices/virtual/timed_output/vibrator/enable /sys/class/leds/vibrator/activate; do [ -e "$c" ] && V="$c" && break; done; \
-  for i in 1 2 3; do [ -n "$V" ] && echo 300 > "$V" 2>/dev/null && sleep 0.6; done'
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do [ -n "$V" ] && echo 300 > "$V" 2>/dev/null && sleep 0.6; done; \
+  B=$(ls /sys/class/backlight/*/brightness 2>/dev/null | head -1); \
+  if [ -n "$B" ]; then M=$(cat /sys/class/backlight/max_brightness 2>/dev/null || echo 255); \
+    for i in 1 2 3 4; do echo 0 > "$B" 2>/dev/null; sleep 0.4; echo "$M" > "$B" 2>/dev/null; sleep 0.5; done; \
+  fi'
 
 [Install]
 WantedBy=multi-user.target

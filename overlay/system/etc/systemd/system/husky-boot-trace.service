@@ -12,7 +12,11 @@ ExecStart=/bin/sh -c '\
   dmesg | tail -80 > /dev/pmsg0 && \
   echo "QL-TRACE: udc: $(ls /sys/class/udc/ 2>&1)" > /dev/pmsg0 && \
   cat /sys/class/udc/*/state > /dev/pmsg0 2>&1 && \
-  echo "QL-TRACE: end-sysinit" > /dev/pmsg0'
+  echo "QL-TRACE: end-sysinit" > /dev/pmsg0; \
+  B=$(ls /sys/class/backlight/*/brightness 2>/dev/null | head -1); \
+  if [ -n "$B" ]; then M=$(cat /sys/class/backlight/max_brightness 2>/dev/null || echo 255); \
+    for i in 1 2 3; do echo 0 > "$B" 2>/dev/null; sleep 0.4; echo "$M" > "$B" 2>/dev/null; sleep 0.5; done; \
+  fi'
 
 [Install]
 WantedBy=sysinit.target
