@@ -484,21 +484,31 @@ mountroot() {
 	# list of possible userdata partition names
 	partlist="userdata UDA DATAFS USERDATA"
 
-	# Husky vibrator helper: user-visible boot progress (pulse counts).
+	# Husky user-signal helpers: visible/audible boot progress that does
+	# not depend on pstore (lost on hard reset). Signals: backlight blinks
+	# + vibrator pulses, count = stage.
 	QLVIB=""
 	for _v in /sys/class/timed_output/vibrator/enable /sys/devices/virtual/timed_output/vibrator/enable /sys/class/leds/vibrator/activate; do
 		[ -e "$_v" ] && QLVIB="$_v" && break
 	done
-	qlbeep() {
-		_i=$1
-		while [ "$_i" -gt 0 ]; do
-			echo 200 > "$QLVIB" 2>/dev/null
-			sleep 0.6
-			_i=$((_i - 1))
+	QLBL=""
+	for _b in /sys/class/backlight/*/brightness; do
+		[ -e "$_b" ] && QLBL="$_b" && break
+	done
+	[ -n "$QLBL" ] && QLBLMAX=$(cat /sys/class/backlight/max_brightness 2>/dev/null || echo 255)
+	qlsig() {
+		_n=$1
+		while [ "$_n" -gt 0 ]; do
+			[ -n "$QLVIB" ] && echo 200 > "$QLVIB" 2>/dev/null
+			[ -n "$QLBL" ] && echo 0 > "$QLBL" 2>/dev/null
+			sleep 0.4
+			[ -n "$QLBL" ] && echo "$QLBLMAX" > "$QLBL" 2>/dev/null
+			sleep 0.5
+			_n=$((_n - 1))
 		done
 	}
-	echo "QL: vibrator=$QLVIB" > /dev/pmsg0 2>/dev/null || true
-	[ -n "$QLVIB" ] && qlbeep 1
+	echo "QL: vib=$QLVIB bl=$QLBL" > /dev/pmsg0 2>/dev/null || true
+	qlsig 1
 	echo "QL: mountroot-start" > /dev/pmsg0 2>/dev/null || true
 	# Arm the hung-task detector so a stuck boot self-panics (panic=10)
 	# instead of hanging forever - a clean panic preserves pstore, a hard
@@ -517,7 +527,7 @@ mountroot() {
 
 	load_kernel_modules
 	echo "QL: modules-done" > /dev/pmsg0 2>/dev/null || true
-	{ [ -n "$QLVIB" ] && qlbeep 2; } || true
+	qlsig 2
 	# If no UDC appeared, the phy probe likely deferred on pd-hsi0 and
 	# nothing retried it (stock zuma defer race): bounce the phy module.
 	if [ -z "$(ls /sys/class/udc/ 2>/dev/null)" ]; then
