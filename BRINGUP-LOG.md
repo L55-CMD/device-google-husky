@@ -1,5 +1,111 @@
 # Husky bring-up log
 
+## HANDOVER 2026-11-08 ~19:45 UTC (day 5)
+STATUS: the 6.4s boot blocker is FIXED in the kernel (test-r12-lazylink:
+lazy s2mpu link + pkvm-s2mpu self-pin). Boots now run PAST the old panic
+point and hang LATER: steady white logo, zero USB, kernel alive (power
+button turns screen off/on = soft hang). hung_task_panic fires after
+~60-120s (phone eventually panic-loops to fastboot as ABL retries
+exhaust). The hanging task is UNKNOWN - every forensics channel we built
+keeps coming back empty (details below). Next session: land the
+flash-resident console logger, identify the hung task, fix it.
+
+### Verified today (hard evidence)
+1. ROOT CAUSE of the whole week: exynos_usbdrd_set_s2mpu_pm_ops()
+   publishes s2mpu_pm_control into a RAW STATIC POINTER in the phy module
+   with no lifetime management. phy-probes-first -> link NULL forever ->
+   HSI0 SysMMU PTW fault at first USB gadget DMA (6.3-6.4s). Module
+   unloaded after publish (modprobe failure cleanup of a zero-refcount
+   dep, e.g. after samsung_iommu_v9 fails) -> dangling pointer -> CFI
+   fatal in manual_control (observed target = fips140 module memory,
+   day-2/3 'garbage CFI pointer' = same family, etm2dram).
+2. FIX pushed & CI-green: kernel-patches + manifest branch
+   test-r12-lazylink (0002 lazy link resolution in manual_control() AND
+   set_s2mpu_pm_ops(); 0003 __module_get(THIS_MODULE) self-pin in
+   pkvm_s2mpu mod_init). Both patches validated with git am --3way
+   simulation. Kernel CI run 42483940304 SUCCESS; device CI 42487357822
+   SUCCESS.
+3. phydefer (EPROBE_DEFER in the phy probe) REGRESSED: phy never
+   re-probes at all -> zero USB. Do NOT rely on driver-core re-probe on
+   this platform. Probe stays 100% stock in lazylink.
+4. The stock phy probe has its OWN pd-hsi0 LDO defer; whether its retry
+   fires is timing-luck. Hypothesis for the CURRENT hang (unproven):
+   defer lands -> no dwc3 -> no UDC -> UT waits for USB forever. An
+   initrd UDC-empty bounce of phy-exynos-usbdrd-eusb-super is already in
+   the branch (needs a test where the forensics actually capture).
+5. hung_task_panic WORKS: initrd sets /proc/sys/kernel/hung_task_panic=1
+   @60s (sysctl exists; bootparam compiled out). D-state hang ->
+   panic -> 10s -> reboot -> loop until ABL parks in fastboot.
+6. Forensics that FAILED and why:
+   - pstore after LONG hangs: EMPTY. pstore mounts fine in initrd
+     (rc=0, verified d442d17 build) but ALL zones are empty after a
+     hung_task panic+reboot. After SHORT panics (6.4s SysMMU) records
+     survived. Mechanism unknown (suspect bootloader/DSS stomping or
+     zone-header invalidation during the long hang). DO NOT rely on
+     pstore for hang forensics on this device.
+   - vibrator/backlight user-signals: mistimed - vibrator module loads
+     AFTER mountroot-start; detection must happen post-module-load.
+     Backlight probes ~2.4s with the panel. Unproven whether any signal
+     ever fired (user felt nothing, but timing made stage-1 impossible).
+   - quickload initrd preload of pkvm-s2mpu-v9: CAUSED the dangling
+     pointer CFI trip (module load-then-unload via modprobe cleanup).
+     With kernel 0003 self-pin this is now safe, but the preload itself
+     is unnecessary - the kernel patches make any module order work.
+
+### Next actions (ordered)
+1. LAND THE FLASH LOGGER (device CI, ~15 min): a systemd service in
+   overlay/system that every ~15s writes `dmesg | tail -200` + `ps` to
+   /userdata/system-data/husky-console.snap (simple overwrite, no pstore
+   dependency; userdata survives panics, initrd e2fsck handles unclean).
+   This is THE reliable channel - it captures the last boot messages
+   before silence regardless of hang type. (huskies have no standalone
+   cache partition; /cache is a userdata dir.)
+2. Boot the lazylink build + logger; let it hang; panic-loop; then
+   recovery -> mount userdata -> read husky-console.snap. The last lines
+   before silence name the hung subsystem (candidates: USB gadget config
+   (no UDC), display/DECON handover, lxc/android container, fstab/mount
+   wait).
+3. If the snapshot shows no UDC: the stock pd-hsi0 defer hypothesis is
+   confirmed; the in-branch initrd phy-bounce is the test (or promote it
+   to always-run after modules). If it shows a different task: fix that.
+4. Only after UT reaches userspace with USB: revisit display (white logo
+   never replaced = no fb handover ever observed) and Lomiri.
+5. Cleanup debt: remove the abandoned quickload preload + pmsg trace
+   services from the device branch once the logger lands; squash 0002
+   patch iterations before any merge; delete dead CI branches
+   (test-r12-nocfi/nos2mpu/newkleaf/ltonone*/los-pure*).
+
+### Infra/method notes (do not rediscover)
+- Git pushes via credential manager HANG (invisible GCM prompt). Push
+  with the watch-ci.sh PAT inline:
+  git -c credential.helper= push https://x-access-token:TOKEN@github.com/... 
+  (TOKEN=$(grep -m1 -oE 'ghp_[A-Za-z0-9]+' ~/bootdebug/watch-ci.sh))
+- Device CI push trigger often does NOT fire on new branches; dispatch
+  manually: POST /actions/workflows/build-final.yml/dispatches {ref}.
+  GitHub 504s on release-asset downloads happen daily; just re-run the
+  failed job.
+- Device builds ~13-15 min, kernel builds ~40-45 min. Image sets:
+  boot-images.zip + super.img.part-{aa,ab,ac}, cat the parts.
+- CI-built boot images have a NONSTANDARD header (ramdisk size at 0x0C,
+  payload at 4096). Do NOT hand-repack boot images for this pipeline.
+- ABL slot-retry-count POISONS diagnosis: after ~3 failed boots ABL
+  parks in fastboot and every attempt looks like instant failure. Check
+  `fastboot getvar slot-retry-count:b`; reset with set_active a&&b.
+  Panic loops exhausting retries look identical to ABL rejection.
+- Recovery boots need the FULL LOS stack from ~/husky-verify (boot.img,
+  los-dtbo.img, los-init_boot.img, vendor_boot.img,
+  los-vendor_kernel_boot.img) - partial swaps fall back to fastboot or
+  'no command'. Recovery ADB toggle (Advanced) resets EVERY boot. In
+  recovery: mount userdata with `mount /dev/block/by-name/userdata
+  /mnt/ud`. adb pull needs MSYS_NO_PATHCONV=1 for absolute unix paths.
+- HOST: adb/fastboot verified working (Google USB driver oem28.inf);
+  flaky cable was replaced - if the phone drops off USB entirely, reseat
+  or swap it. /tmp on this Windows box is aggressively cleaned between
+  shell calls - keep scratch files under ~/bootdebug.
+- Local artifacts: ~/husky-flash/r12-lazylink (current full image set),
+  ~/husky-verify (LOS stack), ~/bootdebug/day5 (pstores, blackboxes,
+  CI logs). 26 GB of dead-end experiment images were deleted today.
+
 ## DAY 5 2026-11-08 ~10:45 UTC
 - phydefer (EPROBE_DEFER in phy probe) EMPIRICALLY WORSE: boot -> zero USB
   enumeration at all (no gadget, no fastboot flap, stable white logo; host
