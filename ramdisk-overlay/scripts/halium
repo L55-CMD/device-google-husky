@@ -484,6 +484,21 @@ mountroot() {
 	# list of possible userdata partition names
 	partlist="userdata UDA DATAFS USERDATA"
 
+	# Husky vibrator helper: user-visible boot progress (pulse counts).
+	QLVIB=""
+	for _v in /sys/class/timed_output/vibrator/enable /sys/devices/virtual/timed_output/vibrator/enable /sys/class/leds/vibrator/activate; do
+		[ -e "$_v" ] && QLVIB="$_v" && break
+	done
+	qlbeep() {
+		_i=$1
+		while [ "$_i" -gt 0 ]; do
+			echo 200 > "$QLVIB" 2>/dev/null
+			sleep 0.6
+			_i=$((_i - 1))
+		done
+	}
+	echo "QL: vibrator=$QLVIB" > /dev/pmsg0 2>/dev/null || true
+	[ -n "$QLVIB" ] && qlbeep 1
 	echo "QL: mountroot-start" > /dev/pmsg0 2>/dev/null || true
 	# Arm the hung-task detector so a stuck boot self-panics (panic=10)
 	# instead of hanging forever - a clean panic preserves pstore, a hard
@@ -502,6 +517,18 @@ mountroot() {
 
 	load_kernel_modules
 	echo "QL: modules-done" > /dev/pmsg0 2>/dev/null || true
+	{ [ -n "$QLVIB" ] && qlbeep 2; } || true
+	# If no UDC appeared, the phy probe likely deferred on pd-hsi0 and
+	# nothing retried it (stock zuma defer race): bounce the phy module.
+	if [ -z "$(ls /sys/class/udc/ 2>/dev/null)" ]; then
+		tell_kmsg "QL: no UDC, retrying phy module"
+		echo "QL: udc-empty, phy retry" > /dev/pmsg0 2>/dev/null || true
+		/sbin/modprobe -r phy-exynos-usbdrd-eusb-super > /dev/kmsg 2>&1
+		sleep 2
+		/sbin/modprobe phy-exynos-usbdrd-eusb-super > /dev/kmsg 2>&1
+		sleep 3
+		echo "QL: udc-after-retry: $(ls /sys/class/udc/ 2>&1)" > /dev/pmsg0 2>/dev/null || true
+	fi
 	{ echo "QL: loaded-modules:"; grep -E "s2mpu|usbdrd|dwc3|samsung_iommu" /proc/modules; } > /dev/pmsg0 2>/dev/null || true
 	tell_kmsg "Finished loading kernel modules"
 	sleep 1

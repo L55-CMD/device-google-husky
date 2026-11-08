@@ -1,0 +1,14 @@
+[Unit]
+Description=Husky bring-up vibrator heartbeat
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c '\
+  V=""; for c in /sys/class/timed_output/vibrator/enable /sys/devices/virtual/timed_output/vibrator/enable /sys/class/leds/vibrator/activate; do [ -e "$c" ] && V="$c" && break; done; \
+  [ -n "$V" ] || exit 0; \
+  while :; do echo 150 > "$V" 2>/dev/null; sleep 10; done'
+
+[Install]
+WantedBy=sysinit.target
