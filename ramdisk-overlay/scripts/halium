@@ -459,7 +459,12 @@ load_kernel_modules() {
 	# lists the phy first.  Preload pkvm-s2mpu-v9 (deps resolved by
 	# modprobe) ahead of the list.  The list's later entry is a no-op.
 	tell_kmsg "Pre-loading pkvm-s2mpu-v9 ahead of module list"
-	/sbin/modprobe pkvm-s2mpu-v9 > /dev/kmsg 2>&1 || tell_kmsg "WARN: pkvm-s2mpu-v9 preload failed"
+	echo "QL: hook-start" > /dev/pmsg0 2>/dev/null || true
+	/sbin/modprobe pkvm-s2mpu-v9 > /tmp/ql-mp.log 2>&1
+	ql_rc=$?
+	echo "QL: modprobe-pkvm rc=$ql_rc" > /dev/pmsg0 2>/dev/null || true
+	cat /tmp/ql-mp.log > /dev/pmsg0 2>/dev/null || true
+	[ "$ql_rc" -ne 0 ] && tell_kmsg "WARN: pkvm-s2mpu-v9 preload failed"
 
 	# Use blacklist and enable verbose output (override the value set by /init)
 	export MODPROBE_OPTIONS="-vb"
@@ -471,6 +476,7 @@ load_kernel_modules() {
 		modname=$(basename "$1" .ko)
 		tell_kmsg "Loading $modname"
 		/sbin/modprobe "$modname" > /dev/kmsg 2>&1
+		echo "QL: load $modname rc=$?" > /dev/pmsg0 2>/dev/null || true
 	done
 }
 
@@ -488,6 +494,7 @@ mountroot() {
 	exec &>/dev/kmsg
 
 	load_kernel_modules
+	{ echo "QL: loaded-modules:"; grep -E "s2mpu|usbdrd|dwc3|samsung_iommu" /proc/modules; } > /dev/pmsg0 2>/dev/null || true
 	tell_kmsg "Finished loading kernel modules"
 	sleep 1
 
