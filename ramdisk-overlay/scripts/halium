@@ -451,6 +451,16 @@ load_kernel_modules() {
 	# kmod modprobe expects modules.dep.bin, so run depmod
 	/sbin/depmod -a
 
+	# husky: pkvm-s2mpu-v9 must probe before the USB phy, otherwise
+	# exynos_usbdrd_phy_probe() finds no s2mpu platform device and
+	# phy_drd->s2mpu stays NULL forever -> S2MPU never allow-all ->
+	# HSI0 SysMMU fault at the first USB gadget DMA.  Stock Android
+	# avoids this with a fixed insmod order; our vendor modules.load
+	# lists the phy first.  Preload pkvm-s2mpu-v9 (deps resolved by
+	# modprobe) ahead of the list.  The list's later entry is a no-op.
+	tell_kmsg "Pre-loading pkvm-s2mpu-v9 ahead of module list"
+	/sbin/modprobe pkvm-s2mpu-v9 > /dev/kmsg 2>&1 || tell_kmsg "WARN: pkvm-s2mpu-v9 preload failed"
+
 	# Use blacklist and enable verbose output (override the value set by /init)
 	export MODPROBE_OPTIONS="-vb"
 
