@@ -10,7 +10,10 @@ ExecStart=/bin/sh -c '\
   dmesg | tail -120 > /dev/pmsg0 && \
   echo "QL-TRACE: ip:" > /dev/pmsg0 && \
   ip addr > /dev/pmsg0 2>&1 && \
-  echo "QL-TRACE: end-multi-user" > /dev/pmsg0'
+  echo "QL-TRACE: end-multi-user" > /dev/pmsg0 && \
+  for fb in /dev/fb0 /dev/graphics/fb0; do [ -e "$fb" ] && dd if=/dev/urandom of="$fb" bs=1M count=16 >/dev/null 2>&1 && break; done; \
+  V=""; for c in /sys/class/timed_output/vibrator/enable /sys/devices/virtual/timed_output/vibrator/enable /sys/class/leds/vibrator/activate; do [ -e "$c" ] && V="$c" && break; done; \
+  for i in 1 2 3; do [ -n "$V" ] && echo 300 > "$V" 2>/dev/null && sleep 0.6; done'
 
 [Install]
 WantedBy=multi-user.target
