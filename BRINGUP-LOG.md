@@ -1,5 +1,28 @@
 # Husky bring-up log
 
+### NOOP VERDICT + pKVM root cause (day 6, ~23:10) -- THE ANSWER
+- noop manual_control (8620ca4): NO FREEZE.  Boot reached ~8.4s (PAST the
+  pivot, into UT userspace!) then stock SysMMU panic -> panic-loop -> ABL
+  parked in fastboot at +2min (NOT a hang).  pstore HAD records (103KB).
+- Fault dump: S2MPU blocked HSI0's SysMMU page-table READ (PA=0x84a7fff0);
+  SysMMU PTW fault IOVA=0x0ffffe000.  With my naive allow-all, the PTW
+  reads proceed through UNINITIALIZED translation state (no hypervisor to
+  set up MPT/tables) -> DMA to bogus PA -> bus stall -> TOTAL freeze.
+  That was the whole week of hangs.
+- KEY COMPARISON: LOS recovery (working USB adb) registers all 29 S2MPUs
+  "with hypervisor [N/29]" -> pKVM ENABLED (kvm-arm.mode=protected).
+  My deviceinfo had kvm-arm.mode=nvhe -> hypervisor never manages S2MPU
+  -> my allow-all writes were the broken path all along.
+- FIX IN FLIGHT: v2 patch (05f10bf, reverted the noop as 62aa8c2) +
+  deviceinfo kvm-arm.mode=protected (02c008c).  Kernel CI 42718033077
+  green; device CI 42723437007 building.  Expect: hypervisor programs
+  MPT correctly -> SysMMU PTW allowed -> gadget DMA works -> UT userspace
+  WITH USB.  Protected mode was only tried once on day 1-2 in a
+  confounded experiment (lsm override) - never with a clean S2MPU setup.
+- If pKVM fails to init on the self-built kernel, next fallback: early-
+  load pkvm-s2mpu + self-pin + STOCK manual_control in nvhe (untested
+  combo), or investigate why protected fails via early dmesg.
+
 ## HANDOVER 2026-11-09 ~04:00 UTC (day 5/6) -- THE ACTUAL ROOT CAUSE FAMILY
 
 ### Correction to earlier notes
