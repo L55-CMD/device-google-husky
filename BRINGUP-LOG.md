@@ -17,6 +17,46 @@
    cover the whole initrd; watchdog dumps task stacks).
 6. If hung: force-reboot (VolDown+Power) -> recovery for reads (full LOS stack
    needed for recovery boots; Enable ADB toggle resets every boot).
+## UPDATE 2026-11-09 ~10:35 UTC (day 6, morning) -- r8 theory DEAD; freeze follows the lazy-link patch
+
+### r8-lazylink first boot result (run 42596000434, flashed 10:08)
+- Froze at EXACTLY the same op as r12-lazylink: last marker
+  `pre-move-userdata` at 6.45s (bb: ~/bootdebug/day6/bb1-full.txt).
+  So the freeze is NOT an r12 GKI bug: it tracks the LAZY-LINK module
+  patches on BOTH kernel bases.
+- Last night's "patches exonerated" cross-experiment was FLAWED: with the
+  rootfsfix kernel, the lazylink modules almost certainly never loaded
+  (vermagic mismatch / its own vendor_kernel_boot carries stock modules).
+  That boot ran STOCK modules -> passed the move -> SysMMU panic 6.47s.
+  Corrected correlation:
+    stock/noop/rtpm modules -> pass mount --move (every time)
+    lazy-link modules      -> total freeze at ~6.1-6.45s (6/6 boots)
+
+### New patch (kernel-patches d93680c, branch test-r8-lazylink)
+- manual_control(): NO of_find_device_by_node (deadlock risk in the hsi0
+  power-domain path vs dm-node uevent probes at ~6.26s), NO raw
+  cross-module s2mpu_notify pointer (CFI/lifetime hazard).  Now uses
+  pm_runtime_resume/suspend(phy_drd->s2mpu) -- the rtpm approach, the
+  only variant that ever reached userspace with working USB (08:47).
+- Probe-order race fix kept ONLY in set_s2mpu_pm_ops() (pkvm probe
+  context, safe): links phy_drd->s2mpu when the phy probed first.
+- 0003 self-pin kept (harmless, still guards module lifetime).
+- Honest caveat: exact freeze mechanism not proven (link may resolve at
+  2.4s, so repeated lookups may not even fire).  This build is also an
+  experiment: if it still freezes at the same op, the cause is elsewhere
+  (self-pin, or the S2MPU bypass itself), NOT the power-path lookup.
+
+### Pipeline
+- Kernel CI run 42601712688 building (~45 min).  Then re-dispatch device
+  build-final.yml ref=test-r8-lazylink (branch + all initrd instrumentation
+  unchanged), download to ~/husky-flash/r8-lazylink/, flash, boot, watch
+  for RNDIS/adb.  Blackbox read path unchanged (LOS recovery stack in
+  ~/husky-verify, adb pull /mnt/ud/husky-blackbox.log -- use Windows-style
+  local path and MSYS_NO_PATHCONV=1).
+- Infra note: git push to kernel-patches needs the PAT in the URL
+  (x-access-token:...@github.com/L55-CMD/kernel-patches-husky.git);
+  credential helper has no stored entry and terminal prompts are disabled.
+
 ## HANDOVER 2026-11-09 ~04:00 UTC (day 5/6) -- THE ACTUAL ROOT CAUSE FAMILY
 
 ### Correction to earlier notes
