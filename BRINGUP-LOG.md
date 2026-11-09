@@ -46,6 +46,32 @@
   experiment: if it still freezes at the same op, the cause is elsewhere
   (self-pin, or the S2MPU bypass itself), NOT the power-path lookup.
 
+### Code review findings (day 6, ~10:55, full source pass)
+Sources reviewed line-by-line: phy-exynos-usbdrd-eusb.c (2421 lines),
+pkvm_s2mpu.c, common/s2mpu.c, exports.c, exynos-pd.c, exynos-pd_hsi0.c,
+dwc3-exynos.c (LineageOS gs-6.1 @ lineage-23.2).
+- Caller context: exynos_pd_power_on/off holds pd->access_lock = MUTEX
+  (sleepable) -> pm_runtime_* in manual_control is LEGAL there and at the
+  dwc3-exynos probe call site (dwc3-exynos.c:1286).
+- s2mpu_pm_ops SET_RUNTIME_PM_OPS maps to the SAME __pkvm_s2mpu_resume/
+  suspend functions the raw notify pointer called.  nvhe resume = single
+  writel_relaxed (no hypercall).
+- phy_drd->s2mpu used ONLY in manual_control; no other phy-code surface.
+- Stock get_struct() ALREADY does of_find_device_by_node on every
+  manual_control call -> the old patch's added lookup was NOT a new risk
+  class; the ABBA-lookup theory is weak.
+- BUS-STALL HYPOTHESIS (best fit for the freeze): old patch called
+  s2mpu_pm_control DIRECTLY -> raw S2MPU MMIO writes without PM core
+  powering the S2MPU block/domain first.  MMIO to an unclocked IP = bus
+  transaction never completes -> CPU stalls in the store, interconnect
+  backpressure -> TOTAL freeze, no pstore/hung_task/watchdog.  Explains
+  the wandering freeze time (fires on a pd-hsi0 transition, not on a
+  specific initrd op) and why stock-with-NULL-link never froze (no write).
+  The pm_runtime path powers suppliers first -> write always lands on a
+  clocked block.  The d93680c build tests exactly this.
+- If the new build STILL freezes: next suspect is the S2MPU allow-all
+  state itself (silent DMA mis-routing corrupting RAM) or non-USB causes.
+
 ### Pipeline
 - Kernel CI run 42601712688 building (~45 min).  Then re-dispatch device
   build-final.yml ref=test-r8-lazylink (branch + all initrd instrumentation
