@@ -15,7 +15,7 @@ deviceinfo_kernel_image_name="Image.lz4"
 # Kernel cmdline
 # Stock zuma (LineageOS husky): earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 ...
 # Added: console=tty0 (required for Ubuntu Touch rootfs), systempart=/dev/mapper/system
-deviceinfo_kernel_cmdline="lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,apparmor,selinux console=tty0 earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 printk.devkmsg=on cgroup.memory=nokmem rcupdate.rcu_expedited=1 rcu_nocbs=all rcutree.enable_rcu_lazy swiotlb=noforce disable_dma32=on at24.write_timeout=100 log_buf_len=1024K bootconfig systempart=/dev/mapper/system kvm-arm.mode=nvhe exynos_drm.dp_rate=2"
+deviceinfo_kernel_cmdline="lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,apparmor,selinux console=tty0 earlycon=exynos4210,0x10870000 console=ttySAC0,115200 androidboot.console=ttySAC0 printk.devkmsg=on cgroup.memory=nokmem rcupdate.rcu_expedited=1 rcu_nocbs=all rcutree.enable_rcu_lazy swiotlb=noforce disable_dma32=on at24.write_timeout=100 log_buf_len=1024K bootconfig systempart=/dev/mapper/system kvm-arm.mode=protected exynos_drm.dp_rate=2"
 
 # Boot image - extracted from LineageOS vendor_kernel_boot.img
 deviceinfo_ramdisk_compression="lz4"
