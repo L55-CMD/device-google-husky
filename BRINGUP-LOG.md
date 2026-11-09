@@ -1,5 +1,22 @@
 # Husky bring-up log
 
+## MORNING CHECKLIST (2026-11-09, r8-lazylink first boot)
+
+1. Check kernel CI run 42559072596 (lineage-kernel-manifest-husky) finished
+   green; kernel.zip at release tag `test-r8-lazylink`.
+2. Dispatch device build: POST build-final.yml dispatches ref=test-r8-lazylink
+   (device branch ALREADY pushed; path filter won't auto-trigger).
+   Watch for the ~1/3 publish flake -> re-run failed jobs if so.
+3. Download release latest-test-r8-lazylink: boot-images.zip (unzip to
+   boot-new/) + super.img parts (SEQUENTIAL downloads only; assembled size
+   must equal the sum of parts).
+4. Phone is in LOS recovery with adb enabled -> `adb reboot bootloader`, flash
+   boot-new/ stack + super.img, `fastboot reboot`.
+5. Watch: RNDIS/adb on host within ~2 min = USERSPACE REACHED.  White logo +
+   no USB = r8 theory wrong -> read /userdata/husky-blackbox.log (markers now
+   cover the whole initrd; watchdog dumps task stacks).
+6. If hung: force-reboot (VolDown+Power) -> recovery for reads (full LOS stack
+   needed for recovery boots; Enable ADB toggle resets every boot).
 ## HANDOVER 2026-11-09 ~04:00 UTC (day 5/6) -- THE ACTUAL ROOT CAUSE FAMILY
 
 ### Correction to earlier notes
