@@ -656,18 +656,21 @@ mountroot() {
 	# point, at +25s this dumps dmesg, all task states and ALL KERNEL
 	# STACKS to the flash blackbox -- naming the stuck task and its stack.
 	( sleep 25
+	  echo "QL WATCHDOG-FIRE uptime=$(cut -d' ' -f1 /proc/uptime)" > /dev/pmsg0 2>/dev/null
 	  {
 	    echo "=== QL WATCHDOG $(date -u +%H:%M:%S) uptime=$(cut -d' ' -f1 /proc/uptime) ==="
-	    echo "--- dmesg tail ---"
-	    dmesg | tail -200
-	    echo "--- tasks ---"
-	    ps
 	    echo "--- kernel stacks ---"
 	    for t in /proc/[0-9]*; do
 	      echo "[${t}] $(cat $t/comm 2>/dev/null) state=$(awk '/^State:/{print $2}' $t/status 2>/dev/null)"
 	      cat $t/stack 2>/dev/null
 	    done
-	  } >> /tmpmnt/husky-blackbox.log 2>/dev/null ) &
+	    echo "--- tasks ---"
+	    ps
+	    echo "--- dmesg tail ---"
+	    dmesg | tail -200
+	  } >> /tmpmnt/husky-blackbox.log 2>/dev/null
+	  echo "QL WATCHDOG-DONE" > /dev/pmsg0 2>/dev/null ) &
+	( sleep 60; echo "QL WATCHDOG2-ALIVE uptime=$(cut -d' ' -f1 /proc/uptime)" > /dev/pmsg0 2>/dev/null ) &
 
 	# setup super partition if exists
 	if [ -n "/dev/disk/by-partlabel/super" ]; then
