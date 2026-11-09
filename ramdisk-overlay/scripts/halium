@@ -647,15 +647,20 @@ mountroot() {
 		done
 	} >> /tmpmnt/husky-blackbox.log 2>/dev/null
 
+	# husky: kernel console/printk wedges at ~5.5s in this build; from here
+	# on route every initrd message to the flash log only so the boot can
+	# walk through printk-wedge territory.
+	tell_kmsg() { qlprog "kmsg: $*"; }
+
 	# setup super partition if exists
 	if [ -n "/dev/disk/by-partlabel/super" ]; then
 		tell_kmsg "trying to parse and dmsetup subpartitions from super partition"
-		qlprog "pre-dynparts"
-		timeout 15 /sbin/parse-android-dynparts /dev/disk/by-partlabel/super > /run/dynparts.out 2>&1
+		qlprog "pre-dynparts slot-suffix=$ab_slot_suffix cmdline=$(grep -o 'slot_suffix=[^ ]*' /proc/cmdline)"
+		/sbin/parse-android-dynparts /dev/disk/by-partlabel/super > /run/dynparts.out 2>&1
 		qlprog "parse rc=$? bytes=$(wc -c < /run/dynparts.out 2>/dev/null)"
 		sh /run/dynparts.out
 		qlprog "dm-create rc=$?"
-		timeout 15 dmsetup mknodes
+		dmsetup mknodes
 		qlprog "mknodes rc=$?"
 		qlprog "post-dynparts mapper=[$(ls /dev/mapper/ 2>/dev/null | tr '
 ' ',')]"
