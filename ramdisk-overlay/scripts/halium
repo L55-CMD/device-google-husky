@@ -652,6 +652,23 @@ mountroot() {
 	# walk through printk-wedge territory.
 	tell_kmsg() { qlprog "kmsg: $*"; }
 
+	# husky: post-wedge forensics watchdog.  If the boot wedges after this
+	# point, at +25s this dumps dmesg, all task states and ALL KERNEL
+	# STACKS to the flash blackbox -- naming the stuck task and its stack.
+	( sleep 25
+	  {
+	    echo "=== QL WATCHDOG $(date -u +%H:%M:%S) uptime=$(cut -d' ' -f1 /proc/uptime) ==="
+	    echo "--- dmesg tail ---"
+	    dmesg | tail -200
+	    echo "--- tasks ---"
+	    ps
+	    echo "--- kernel stacks ---"
+	    for t in /proc/[0-9]*; do
+	      echo "[${t}] $(cat $t/comm 2>/dev/null) state=$(awk '/^State:/{print $2}' $t/status 2>/dev/null)"
+	      cat $t/stack 2>/dev/null
+	    done
+	  } >> /tmpmnt/husky-blackbox.log 2>/dev/null ) &
+
 	# setup super partition if exists
 	if [ -n "/dev/disk/by-partlabel/super" ]; then
 		tell_kmsg "trying to parse and dmsetup subpartitions from super partition"
@@ -824,13 +841,16 @@ mountroot() {
 		qlprog "normal-boot-branch"
 
 		mount --move /halium-system ${rootmnt}
+		qlprog "moved-halium-system rc=$?"
 		mkdir -p ${rootmnt}/android
 
 		# Mounting userdata outside of /android, to avoid having LXC container access it
 		mkdir -p ${rootmnt}/userdata
 		mount --move /tmpmnt ${rootmnt}/userdata
+		qlprog "moved-userdata rc=$?"
 
 		mount --move /android-rootfs ${rootmnt}/var/lib/lxc/android/rootfs
+		qlprog "moved-android-rootfs rc=$?"
 		[ $ANDROID_IMAGE_MODE = "system" ] && mount -o rw,size=4096 -t tmpfs none ${rootmnt}/android
 		[ $ANDROID_IMAGE_MODE = "rootfs" ] && mount -o bind ${rootmnt}/var/lib/lxc/android/rootfs ${rootmnt}/android
 
@@ -839,23 +859,29 @@ mountroot() {
 		# Create a fake android data, shared by rootfs and LXC container
 		mkdir -p ${rootmnt}/userdata/android-data
 		mount -o bind ${rootmnt}/userdata/android-data ${rootmnt}/android/data
+		qlprog "bound-android-data rc=$?"
 		[ ! -h ${rootmnt}/data ] && ln -sf /android/data ${rootmnt}/data
 
 		set_halium_version_properties ${rootmnt} ${rootmnt}/userdata/android-data
+		qlprog "halium-version-set rc=$?"
 
 		# Get device information
 		device=$(grep ^ro.product.device= /android-system/build.prop | sed -e 's/.*=//')
 		[ -z "$device" ] && device="unknown" && tell_kmsg "WARNING: Didn't find a device name. Is the Android system image mounted correctly?"
 		tell_kmsg "device is $device"
+		qlprog "device=$device"
 
 		process_bind_mounts
+		qlprog "process-bind-mounts-done"
 
 		# Mount all the Android partitions
 		mount_android_partitions "${rootmnt}/var/lib/lxc/android/rootfs/fstab*" ${rootmnt}/android ${rootmnt}/userdata
+		qlprog "android-partitions-done rc=$?"
 
 		# system is a special case
 		tell_kmsg "moving Android system to /android/system"
 		mount --move /android-system ${rootmnt}/android/system
+		qlprog "moved-android-system rc=$?"
 
 		# halium overlay available in the Android system image (hardware specific configs)
 		if [ -e ${rootmnt}/android/system/halium ]; then
@@ -871,6 +897,7 @@ mountroot() {
 
 		# Bind-mount /lib/modules from Android
 		mount_kernel_modules
+		qlprog "kernel-modules-bound rc=$?"
 
 		# Bind-mount /var/lib/ureadahead if available on persistent storage
 		# this is required because ureadahead runs before mountall
