@@ -1,5 +1,78 @@
 # Husky bring-up log
 
+## HANDOVER 2026-11-09 ~04:00 UTC (day 5/6) -- THE ACTUAL ROOT CAUSE FAMILY
+
+### Correction to earlier notes
+**rootfsfix and nos2mpu kernels are GKI tag android14-6.1-2025-08_r8.  ALL
+"test-r12-*" kernels are r12.**  I repeatedly called rootfsfix "r12" -- wrong.
+The r8->r12 bump happened at the hold branch (day 2/3 era).  Verify the pinned
+tag in default.xml before assuming anything from branch names.
+
+### The week, correctly explained
+- r8 kernels: boot ALWAYS passes the initrd mount phase (rootfsfix reached
+  USERSPACE on Nov 6; nos2mpu pstore shows tasks at 6.3s+).  They still have
+  the S2MPU NULL-link race -> 6.4s SysMMU panic unless the race is won.
+- r12 kernels: carry an ADDITIONAL latent, intermittent TOTAL-FREEZE bug.
+  Day 2's "test-kernel-r12 canonical: FROZEN LOGO, no pstore, unexplained" was
+  this freeze.  rtpm (r12) won the dice at 08:47 and ran 5 min; lazylink (r12)
+  froze 5/5 boots.  When the S2MPU panic is unfixed it masks the freeze (panic
+  at 6.4s vs freeze at ~6.1s are adjacent; whichever fires first wins).
+- Our lazylink patches (lazy s2mpu link + pkvm self-pin) are EXONERATED:
+  rootfsfix(r8) kernel + lazylink modules + lazylink super -> NO freeze;
+  it panicked at 6.47s with the plain stock-S2MPU fault instead (expected --
+  that kernel runs unpatched vendor modules from ITS OWN vendor_kernel_boot).
+
+### Freeze signature (fully localized)
+- Boot walks to `mount --move /tmpmnt ${rootmnt}/userdata` (~6.1s) then TOTAL
+  freeze: no printk, no pstore, no hung_task/softlockup, no watchdog timers,
+  no reboots.  White logo forever.
+- Per-op flash markers (qlprog -> /tmpmnt/husky-blackbox.log on userdata)
+  give line-by-line localization through the whole initrd; the +25s/+60s
+  watchdogs also froze, proving it's not a single blocked task but a
+  system-wide freeze.
+- data=journal vs ordered: irrelevant.  The freeze is an r12 codegen/layout-
+  sensitive latent race (a test-no-sched-padding branch exists from earlier
+  work -- the r12 scheduler was already suspected once).
+
+### ACTION IN FLIGHT (kernel CI ~45 min, then ~15 min device CI)
+- Branch `test-r8-lazylink` (kernel-patches + manifest): GKI **r8** base +
+  the same 0001 GPU + 0002 lazy-link + 0003 self-pin patches.  Kernel CI run
+  42559072596 building NOW; kernel.zip will land at release tag
+  `test-r8-lazylink`.
+- Next: create DEVICE branch `test-r8-lazylink` (from test-r12-lazylink tip --
+  keeps all initrd instrumentation), push (paths filter may not trigger ->
+  dispatch build-final.yml manually), flash boot stack + super, boot.
+- EXPECTATION: boot completes to userspace with the S2MPU race fixed -> USB
+  gadget comes up when UT's usb service configures it -> RNDIS/ADB on host ->
+  live shell.  Then: display handover (never seen working yet), and
+  eventually chase the r12 freeze for the merge to main (or stay on r8).
+
+### Working state right now
+- Phone: LOS recovery, adb ENABLED (toggle resets every boot).
+- On-disk image sets: ~/husky-flash/r12-lazylink (latest r12 build),
+  ~/husky-flash/r12-rootfsfix (Nov 6 r8 stack -- the proven-good base),
+  ~/husky-verify (LOS recovery stack).
+- Blackbox with all stage traces: /userdata/husky-blackbox.log (read from
+  recovery: mkdir /mnt/ud; mount /dev/block/by-name/userdata /mnt/ud).
+- Never flash a super whose parts were assembled concurrently by a "lost"
+  background task -- they keep running and corrupt each other (hit twice).
+
+### Infra quick reference (accumulated)
+- Pushes: use PAT inline (GCM hangs): git push https://$TOKEN@github.com/...
+  Token: first ghp_... in ~/bootdebug/watch-ci.sh. MSYS_NO_PATHCONV=1 for
+  adb pull/push of absolute remote paths.
+- CI: device build-final.yml must be dispatched MANUALLY for new branches
+  (path filter quirk).  The `gh release create` publish step flakes ~1/3
+  (404 on super.img.part-ac) -- just re-run failed jobs.
+- Kernel CI triggers automatically on manifest-branch push.
+- Device CI resolves its kernel.zip by RELEASE TAG == DEVICE BRANCH NAME.
+- Boot images from this pipeline have a NONSTANDARD header (ramdisk size at
+  offset 0x0C) -- no local mkbootimg surgery; use CI-built images.
+- Recovery reads: flash the FULL LOS stack (boot+dtbo+init_boot+vendor_boot+
+  vendor_kernel_boot from ~/husky-verify) or it falls back to fastboot.
+- fastboot watch loops: grep for the SERIAL (38111), never the word "device"
+  (adb header false-positive).
+
 ## DAY 5 night (~01:30 UTC) -- printk-wedge localization
 
 - qlprog markers flush DIRECTLY to /tmpmnt/husky-blackbox.log once userdata is
