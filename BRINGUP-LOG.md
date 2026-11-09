@@ -72,6 +72,25 @@ dwc3-exynos.c (LineageOS gs-6.1 @ lineage-23.2).
 - If the new build STILL freezes: next suspect is the S2MPU allow-all
   state itself (silent DMA mis-routing corrupting RAM) or non-USB causes.
 
+### v2 (rtpm-style) boot result + noop experiment (day 6, ~22:00)
+- v2 kernel (05f10bf, pm_runtime manual_control + safe link): froze at
+  pre-move-userdata 6.32s (bb2-full.txt).  EXONERATED: power-path lookup,
+  raw notify pointer vs pm_runtime, r12 kernel.  The only common factor
+  left: the S2MPU allow-all bypass actually being WRITTEN/ACTIVE.
+- Note stock SysMMU panic at ~6.47s vs our freezes at 6.32-6.45s = SAME
+  moment -> first gadget DMA is likely the killer in both cases: stock =
+  DMA faults -> clean panic; bypass-active = DMA proceeds to a bogus
+  address -> silent RAM corruption -> total freeze, zero logs.
+- New experiment (kernel-patches 8620ca4, kernel CI run 42706607439):
+  manual_control = COMPLETE NOOP on the same r8 base (self-pin kept).
+  Freeze persists -> S2MPU theory dead entirely.  SysMMU panic returns
+  instead of freeze -> bypass-active confirmed as the killer; fix
+  direction becomes "correct HSI0 DMA mappings", not "bypass S2MPU".
+- Infra lesson: NO backslash escapes in shell heredocs on this host -
+  they get eaten (broke the first v2 kernel build with a literal newline
+  inside pr_debug).  Use WriteFile for code content, generate diffs with
+  git diff, assemble patches with cat.
+
 ### Pipeline
 - Kernel CI run 42601712688 building (~45 min).  Then re-dispatch device
   build-final.yml ref=test-r8-lazylink (branch + all initrd instrumentation
