@@ -1,5 +1,28 @@
 # Husky bring-up log
 
+## DAY 5 night (~01:30 UTC) -- printk-wedge localization
+
+- qlprog markers flush DIRECTLY to /tmpmnt/husky-blackbox.log once userdata is
+  mounted (line-by-line, no printk dependency) -- this finally gives exact
+  localization through the failure window.
+- Boot reaches userdata-mounted at ~5.5s reliably; USB gadget/phy fully up at
+  2.4-2.6s (the S2MPU fix works).  dynparts/dmsetup/rootfs-mount either run
+  fine or fail fast; the boot ALWAYS wedges in the 5.5-6.0s window.
+- Working theory: the kernel console/printk path wedges permanently at ~5.5s
+  (some task holds console/pstore lock; all later printks and pstore writes
+  block; hung_task then can't even panic because panic printk blocks too --
+  explaining no reboots + empty pstore).  Wedge time drifts with which printk
+  crosses first.
+- Mitigation in build d24da93: after userdata mount, tell_kmsg is redefined to
+  write the flash log ONLY, so the initrd can walk through printk-wedge
+  territory.  If the boot completes, systemd/userspace (journald doesn't
+  printk) may bring up the USB gadget -> live adb shell -> inspect the lock
+  holder directly.
+- busybox `timeout` applet does NOT exist in this initrd (rc=127).
+- dm nodes: dynparts creates them fine; without them the script guesses
+  slot suffix _a -- needs verification which suffix the cmdline carries.
+- `git am`-able patch flow and all infra lessons remain in this log below.
+
 ## DAY 5 late additions (~22:00 UTC)
 
 - **adb watch false positive**: `adb devices` output always contains the header
