@@ -57,6 +57,11 @@ mount_apex() {
     source_path="$1"
     target_path="$2"
 
+    if mountpoint -q "$target_path"; then
+        log "Skip $target_path as it's already mounted"
+        return
+    fi
+
     if [ -d "$source_path" ]; then
         # Directory-based APEX
         mkdir -p "$target_path"
@@ -279,7 +284,9 @@ fi
 if [ -d /android/apex ]; then
     log "Handling /android/apex mounts"
 
-    mount -t tmpfs android_apex /android/apex
+    if ! mountpoint -q /android/apex; then
+        mount -t tmpfs android_apex /android/apex
+    fi
 
     for apex_dir in "/android/system/apex" "/android/system_ext/apex"; do
         [ -d "$apex_dir" ] || continue

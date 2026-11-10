@@ -67,6 +67,20 @@ jobs:
             done
           done
 
+      - name: Fix overlay library symlinks
+        # Windows checkouts also turn these soname links into plain text files.
+        run: |
+          set -euo pipefail
+          for f in \
+            overlay/system/usr/lib/aarch64-linux-gnu/libgbinder.so.1 \
+            overlay/system/usr/lib/aarch64-linux-gnu/libgbinder.so.1.1 \
+            overlay/system/usr/lib/aarch64-linux-gnu/libgbinder-radio.so.1 \
+            overlay/system/usr/lib/aarch64-linux-gnu/libgbinder-radio.so.1.6; do
+            target=$(cat "$f")
+            rm "$f"
+            ln -s "$target" "$f"
+          done
+
       - name: Build final Ubuntu Touch artifacts in Docker
         env:
           IMAGE_TAG: husky-final-builder:ci
