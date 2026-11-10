@@ -86,7 +86,8 @@ jobs:
         run: |
           set -euo pipefail
           branch="$(printf '%s' "${{ github.ref_name }}" | sed 's#[^A-Za-z0-9_.-]#-#g')"
-          tag="latest-${branch}"
+          # Kernel releases are named after the manifest branch (rolling per-branch).
+          tag="${branch}"
           kernel_release="$(gh api "repos/${{ github.repository_owner }}/lineage-kernel-manifest-husky/releases/tags/${tag}" \
             --jq '.assets[] | select(.name == "kernel.zip") | .digest')"
           case "${kernel_release}" in
