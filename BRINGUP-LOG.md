@@ -23,6 +23,24 @@
   load pkvm-s2mpu + self-pin + STOCK manual_control in nvhe (untested
   combo), or investigate why protected fails via early dmesg.
 
+### UT BOOTED + RNDIS UP (day 7, ~01:00 UTC) -- MILESTONE
+- protected-mode + symlink-fix build: UT boots to graphical.target, systemd
+  stable 5+ min (previous protected boot: user force-reboot at 339s;
+  panic only in the dwc3 shutdown path - dwc3_exynos_otg_exit NULL deref,
+  cosmetic for now).
+- USB gadget ENUMERATES on the host (VID_18D1 PID_D001, SubClass_06 =
+  CDC NCM despite the "RNDIS" name).  ssh.service/usbdp-gbinder now start
+  (symlink CI step worked).
+- Host-side blocker: Windows does not auto-bind a driver to the NCM
+  device (no NetAdapter appears).  pnputil/UpdateDriverForPlugAndPlayDevicesW
+  fail with error 259; manual Device Manager driver bind needed once.
+- Known remaining issues: Android container fstab missing
+  (/var/lib/lxc/android/rootfs/fstab*) -> display/hwc likely blocked;
+  display handover untouched (white logo); console logger service state
+  to verify once shell access works.
+- Boot evidence: pstore console-ramoops-0 = full log (303KB) pulled to
+  ~/bootdebug/day6/protected-console.txt.
+
 ## HANDOVER 2026-11-09 ~04:00 UTC (day 5/6) -- THE ACTUAL ROOT CAUSE FAMILY
 
 ### Correction to earlier notes
