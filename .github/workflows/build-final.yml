@@ -49,6 +49,20 @@ jobs:
           branch="$(printf '%s' "${{ github.ref_name }}" | sed 's#[^A-Za-z0-9_.-]#-#g')"
           echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
 
+      - name: Fix systemd wants symlinks
+        # Git stores these as plain files on Windows checkouts; systemd 255
+        # ignores non-symlink wants dropins, which silently disables every
+        # custom service (ssh, usbdp-gbinder, loggers).  Convert to symlinks.
+        run: |
+          set -euo pipefail
+          find overlay -type d -name '*.wants' | while read -r d; do
+            find "$d" -maxdepth 1 -type f | while read -r f; do
+              target=$(cat "$f")
+              rm "$f"
+              ln -s "$target" "$f"
+            done
+          done
+
       - name: Build final Ubuntu Touch artifacts in Docker
         env:
           IMAGE_TAG: husky-final-builder:ci
