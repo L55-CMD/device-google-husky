@@ -14,6 +14,13 @@ log() {
 # which gets its permissions broken by Android init's chmod)
 touch /run/lxc-android-sysrq-dummy
 
+# Trust-store daemons inside the container dlopen the host Mir client
+# platform library via the bind-mounted /system/lib... path; if it is not
+# executable they crash-loop with InvalidMirConnection, breaking camera/SMS
+# permission prompts. The halium image ships it as 0644 (Windows checkout
+# cannot represent the mode), so fix it at every boot.
+chmod 755 /usr/lib/aarch64-linux-gnu/mir1/client-platform/android2.so.5 2>/dev/null || true
+
 # Set up overlayfs on /android/system
 log "Setting up overlayfs on /android/system"
 mkdir -p /tmp/android-system-upper /tmp/android-system-work
