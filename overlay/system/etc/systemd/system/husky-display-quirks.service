@@ -1,0 +1,11 @@
+[Unit]
+Description=Husky display bring-up quirks
+After=lxc-android-config.service
+Before=lightdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/lxc-android-config/husky-display-quirks
+
+[Install]
+WantedBy=multi-user.target

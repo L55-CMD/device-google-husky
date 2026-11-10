@@ -1,5 +1,54 @@
 # Husky bring-up log
 
+## HANDOVER 2026-11-10 ~19:15 UTC (day 7) -- UI + SSH + CONTAINER WORKING
+
+### Current state
+- UT boots to the Ubuntu UI and stays up. Android LXC, composer3 AIDL,
+  repowerd, LightDM/Lomiri and RNDIS SSH are all confirmed working.
+- SSH: 10.15.19.82 port 8022, user phablet, EMPTY password. Port 22 also opens,
+  but use 8022 (the intended usb-moded-ssh service).
+- Windows: bind the built-in "Remote NDIS Compatible Device" driver manually
+  to the RNDIS interface (VID_18D1 PID_4EE3), then assign host 10.15.19.83/24.
+- Android rootfs is on userdata as /android-rootfs.img and includes fstab.zuma
+  and fstab.zuma-fips. vendor/vendor_dlkm/system_dlkm mount successfully.
+- Current display issue: UI renders, but the bottom region is scrambled.
+  Everything else (including SSH and container) stays alive.
+
+### Hard-won fixes (do not re-debug these)
+- kernel-patches 6d9a427: dwc3-exynos returns -EPROBE_DEFER when the DWC3 child
+  drvdata is not ready. Previously ret stayed 0, OTG never initialized and UDC
+  remained "not attached" despite a valid ConfigFS gadget.
+- device 2d771b9: generic RNDIS config, valid systemd wants links, userdata
+  Android image precedence, stock zuma fstabs injected into android-rootfs.img.
+- device 49a3411: usb env moved to /etc/default/usb-moded.d and default
+  developer_mode. /userdata/.force-adb must be absent; .force-ssh present.
+  force-adb.service otherwise rewrites mode to mtp_adb -> charging fallback.
+- device 942110e: executable container scripts, libgbinder soname links, APEX
+  duplicate mount handling. device cd0af0f: executable display/init scripts.
+- device 5d179ca: executable vndservicemanager + usbdp_gbinder and lsc-wrapper
+  waits for composer3 before starting Lomiri. vndservicemanager being 0644 was
+  why composer3 never registered.
+- Display quirk now being committed: bind /dev/null over /dev/video* so
+  gst-plugin-scan cannot trigger the fatal exynos_mfc IOMMU panic, and force
+  --disable-overlays=true. This is what makes the UI survive past ~27s.
+
+### Next work
+1. Fix bottom-of-screen corruption (pixel format/stride/panel scanout path).
+2. Test touch and basic UI stability.
+3. WiFi, sensors/backlight, audio, cellular, camera. Camera/video acceleration
+   needs the exynos_mfc IOMMU fault fixed before removing the video-node quirk.
+4. Noncritical/currently noisy: metadata mount errors, AppArmor, bluebinder,
+   sensorfwd, backlight permissions and some power-HAL errors.
+
+### Useful commands
+- SSH: `ssh -p 8022 phablet@10.15.19.82` (empty password).
+- Container: `sudo lxc-attach -n android --clear-env -- /system/bin/service check android.hardware.graphics.composer3.IComposer/default`
+- Logs: `journalctl -b`, `/var/log/lightdm/unity-system-compositor.log`,
+  Android `sudo lxc-attach -n android -- logcat -d`.
+- Latest branch: device test-r8-lazylink; kernel patches test-r8-lazylink.
+
+---
+
 ## HANDOVER 2026-11-10 ~02:15 UTC (day 6/7) -- UT BOOTS. READ THIS FIRST.
 
 ### State of play in one paragraph

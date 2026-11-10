@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Allow system integrators to tweak the default system compositor behavior
-LSC_FLAGS="--enable-num-framebuffers-quirk=true --disable-overlays=false"
+LSC_FLAGS="--enable-num-framebuffers-quirk=true --disable-overlays=true"
 if [ -d /etc/default/lsc-wrapper.d ]
 then
     for f in /etc/default/lsc-wrapper.d/*

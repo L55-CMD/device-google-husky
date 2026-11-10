@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+# gst-plugin-scan currently triggers a fatal MFC IOMMU fault on husky.
+# Keep V4L2 video nodes unusable until the driver/IOMMU path is fixed.
+for dev in /dev/video*; do
+    if [ -e "$dev" ]; then
+        mount --bind /dev/null "$dev"
+    fi
+done
