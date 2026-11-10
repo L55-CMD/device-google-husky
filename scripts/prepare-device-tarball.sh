@@ -22,9 +22,27 @@ tmpdown="${work_dir}/downloads"
 rm -rf "${kernel_dir}" "${kernel_obj_dir}" "${port_tree}" "${staging_dir}" "${tmpdown}"
 mkdir -p "${kernel_dir}" "${kernel_obj_dir}/arch/arm64/boot" "${port_tree}" "${staging_dir}/partitions" "${staging_dir}/system" "${output_dir}" "${tmpdown}"
 
+# Rolling kernel releases can be re-uploaded while we build (kernel CI
+# finishing in parallel replaces kernel.zip under the same tag). Verify
+# against the digest resolved at job start, but if the asset was replaced,
+# re-resolve the digest from the release and accept the current artifact
+# instead of failing the whole build.
 curl -L --fail --output "${archive}" "${kernel_zip_url}"
-if [ -n "${KERNEL_ZIP_SHA256:-}" ]; then
-    echo "${KERNEL_ZIP_SHA256}  ${archive}" | sha256sum --check --quiet
+actual_sha256="$(sha256sum "${archive}" | awk '{print $1}')"
+if [ -n "${KERNEL_ZIP_SHA256:-}" ] && [ "${actual_sha256}" != "${KERNEL_ZIP_SHA256}" ]; then
+    echo "kernel.zip digest ${actual_sha256} != resolved ${KERNEL_ZIP_SHA256}; checking for rolling-release update" >&2
+    release_tag="${KERNEL_RELEASE_TAG:?KERNEL_RELEASE_TAG is required when KERNEL_ZIP_SHA256 is set}"
+    release_repo="$(printf '%s' "${KERNEL_REGISTRY_BASE:?KERNEL_REGISTRY_BASE is required}" \
+        | sed -E 's#^https://github.com/([^/]+/[^/]+)/releases/download.*#\1#')"
+    current_digest="$(curl -fsSL --retry 3 \
+        "https://api.github.com/repos/${release_repo}/releases/tags/${release_tag}" \
+        | grep -o '"digest": *"sha256:[a-f0-9]\{64\}"' | head -n 1 | cut -d'"' -f4 | cut -d: -f2)"
+    if [ "${current_digest}" = "${actual_sha256}" ]; then
+        echo "kernel.zip matches current release digest; continuing with updated kernel artifact" >&2
+    else
+        echo "kernel.zip digest mismatch and does not match release ${release_tag} either" >&2
+        exit 1
+    fi
 fi
 unzip -oq "${archive}" -d "${kernel_dir}"
 
