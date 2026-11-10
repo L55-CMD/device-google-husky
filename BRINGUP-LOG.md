@@ -41,6 +41,135 @@
 - Boot evidence: pstore console-ramoops-0 = full log (303KB) pulled to
   ~/bootdebug/day6/protected-console.txt.
 
+## HANDOVER 2026-11-10 ~02:15 UTC (day 6/7) -- UT BOOTS. READ THIS FIRST.
+
+### State of play in one paragraph
+Ubuntu Touch BOOTS to graphical.target on the Pixel 8 Pro and is stable in
+userspace (5+ minutes, no freeze).  The week-long total-freeze is FIXED:
+deviceinfo now sets kvm-arm.mode=protected (was nvhe), so the hypervisor
+manages S2MPU memory protection exactly like stock LOS.  USB gadget
+enumerates on the host.  Remaining work is integration, not kernel
+bring-up: USB host access config, Android container rootfs, display.
+
+### Active branches (all pushed)
+- kernel-patches-husky: test-r8-lazylink = 62aa8c2 (v2: pm_runtime
+  manual_control + safe lazy link + self-pin, on GKI r8).
+- lineage-kernel-manifest-husky: test-r8-lazylink (pins GKI r8 + those
+  patches).  Kernel CI green (run 42718033077).
+- device-google-husky: test-r8-lazylink = latest commit has
+  kvm-arm.mode=protected, systemd-wants symlink CI fix, USB_MODED_ARGS=-r
+  (rescue mode), and android-rootfs.img published as a release asset.
+- test-r12-lazylink has older log history; test-r8-lazylink is the live one.
+
+### Build in flight when I stopped
+- Device CI (build-final.yml, ref=test-r8-lazylink) building with rescue
+  mode + android-rootfs.img asset.  Kernel CI does NOT need re-running
+  (kernel unchanged).  If the build failed, re-dispatch:
+    TOKEN=$(grep -m1 -oE 'ghp_[A-Za-z0-9]+' ~/bootdebug/watch-ci.sh)
+    curl -s -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/L55-CMD/device-google-husky/actions/workflows/build-final.yml/dispatches" \
+      -d '{"ref":"test-r8-lazylink"}'
+  Watch the release: https://github.com/L55-CMD/device-google-husky/releases/tag/latest-test-r8-lazylink
+  (publish sometimes takes ~1 min to appear; the release is deleted and
+  recreated each build - empty responses are normal mid-publish.)
+
+### Next steps in order
+1. Download release (boot-images.zip + super.img.part-aa/ab/ac +
+   android-rootfs.img).  Assemble: cat parts > super.img, verify size
+   equals sum of parts.  Sequential downloads only (parallel background
+   tasks collided before).  Unzip boot-images.zip to boot-new/ NOW (an
+   earlier round flashed a stale stack because nobody unzipped).
+2. Phone is in LOS recovery with adb enabled (toggle: Advanced > Enable
+   ADB, resets every recovery boot).  adb reboot bootloader; flash
+   boot-new/{boot,dtbo,init_boot,vendor_boot,vendor_kernel_boot}.img +
+   super.img; fastboot reboot.
+3. RESCUE MODE: UT should come up with RNDIS networking and an emergency
+   SSH server at 10.15.19.82 port 8022 (user phablet).  On Windows, bind
+   the "Remote NDIS Compatible Device" driver to the RNDIS device in
+   Device Manager if it does not auto-bind.  If the phone shows as NCM
+   (SubClass_06) again, Windows has NO native driver for that - the
+   rescue mode is meant to fix it to RNDIS; if not, see "USB notes".
+4. Push the container image: in recovery, adb push android-rootfs.img to
+   /mnt/ud/ (mount userdata first: mkdir -p /mnt/ud; mount -t ext4
+   /dev/block/by-name/userdata /mnt/ud).  Then boot UT - the Android
+   container should now have its fstab and actually start (display and
+   hardware services depend on it).
+5. If SSH works, check: systemctl status lxc-android-config.service,
+   usb-moded.service, ssh.service; journalctl -b; display status.
+
+### Root-cause history (compressed, so nobody re-fights this)
+- Total freeze at ~6.1-6.45s (white logo, no pstore, no watchdog):
+  nvhe mode + my S2MPU allow-all writes let the first HSI0 gadget DMA hit
+  uninitialized translation state -> bus stall.  PROOF: noop
+  manual_control boot reached UT userspace and only died with the stock
+  SysMMU panic (clean, pstore present), while every allow-all variant
+  froze identically.  Fix = kvm-arm.mode=protected (hypervisor handles it).
+- SysMMU panic at ~6.4s on stock kernels = S2MPU blocking the SysMMU's
+  own page-table reads (PA 0x84a7fff0) when phy_drd->s2mpu link is NULL
+  (probe-order race).  v2 patch guarantees the link via
+  set_s2mpu_pm_ops() in pkvm's probe context and drives S2MPU via
+  pm_runtime (not the raw cross-module notify pointer).
+- systemd ignored ALL custom services (ssh, usbdp-gbinder, loggers):
+  Windows checkouts store .wants entries as plain files, not symlinks;
+  systemd 255 ignores non-symlink wants dropins.  CI step now converts
+  them to symlinks (in build-final.yml).
+- Android container had no fstab because android-rootfs.img was only
+  inside system_a (/var/lib/lxc/android/), never on userdata where the
+  halium initrd looks (/tmpmnt/android-rootfs.img).
+
+### USB notes
+- UT presented NCM (VID_18D1 PID_D001, SubClass_06) before rescue mode.
+  Windows has no native ECM/NCM(06) driver; pnputil and
+  UpdateDriverForPlugAndPlayDevicesW both fail (error 259).  RNDIS is the
+  Windows-friendly mode; rescue mode should force it.
+- /userdata/.force-ssh and .force-adb were created (still on userdata)
+  but did NOT change the mode - possibly the new usbd ignores them or
+  lxc-android-config failing blocks the proper mode path.
+
+### Operational runbook / gotchas
+- Token: grep -m1 -oE 'ghp_[A-Za-z0-9]+' ~/bootdebug/watch-ci.sh.  Push
+  with https://x-access-token:$TOKEN@github.com/L55-CMD/<repo>.git (no
+  stored credential helper; terminal prompts disabled).
+- Flash dirs: ~/husky-flash/r8-symlink (current good UT stack),
+  ~/husky-verify (LOS recovery stack: boot.img, los-dtbo, los-init_boot,
+  vendor_boot, los-vendor_kernel_boot).  Recovery loop: flash LOS stack,
+  fastboot reboot recovery, enable ADB toggle, mkdir+mount /mnt/ud.
+- adb pull needs MSYS_NO_PATHCONV=1 and a WINDOWS-style local path
+  (C:/Users/lukes/...), otherwise Git Bash mangles the remote path.
+- NO backslash escapes in shell heredocs on this host - they get eaten
+  (broke a kernel build with a literal newline inside pr_debug).  Use
+  WriteFile for code; generate diffs with git diff; assemble with cat.
+- Loop devices are broken in LOS recovery (losetup works but reads return
+  empty and mounts give I/O error) - do NOT rely on loop there.
+- To read super's logical partitions WITHOUT dmsetup: lpunpack.py (in
+  /tmp/lpunpack.py, from github dstmath/lpunpack).  super.img is SPARSE;
+  de-sparse the first 1MB first (script in session history).  system_a =
+  offset 1 MiB, 3500 MiB, valid ext4.  Metadata at 4096: geometry(52B),
+  backup geometry at 8192, header at 12288 (magic 0x414c5030), partitions
+  at 12544 (52B entries), extents table at header+256.
+- Extracted images on userdata: system_a.img (3.5GB UT rootfs) - safe to
+  delete when space is needed.  Blackbox logs: /mnt/ud/husky-blackbox.log
+  (initrd markers, pulled to ~/bootdebug/day6/bb*.txt); pstore console in
+  recovery: mount -t pstore pstore /sys/fs/pstore.
+
+### Open issues (priority order)
+1. Android container rootfs on userdata (fix staged in the current build).
+2. USB host access (rescue-mode RNDIS expected to work; else NCM driver).
+3. Display handover (white logo throughout; container may be required).
+4. dwc3_exynos_otg_exit NULL deref on shutdown (cosmetic - only crashes
+   the reboot path, systemd-shutdown -> dwc3_exynos_shutdown).
+5. LOS recovery loop driver broken (see runbook).
+6. husky-console-logger.service - verify it runs now (self-mounts
+   userdata at /mnt/husky-dbg, writes husky-console.snap).
+
+### Research notes
+- pmOS runs on husky (XDA "Pmos on pixel 8 pro", author easton57) using
+  stock GrapheneOS boot chain + init_boot overlay: proof non-Android
+  userspace works on this device.  Their init does stock FIPS/UFS init
+  and preserves RANDSTRUCT identity.  No upstream fix exists for the
+  S2MPU probe race (gs-6.1 and gs-6.6 identical).
+- UBports docs: rescue mode (-r) = RNDIS + SSH 10.15.19.82:8022;
+  /userdata/.force-ssh/.force-adb force rescue/adb on boot (see USB notes).
 ## HANDOVER 2026-11-09 ~04:00 UTC (day 5/6) -- THE ACTUAL ROOT CAUSE FAMILY
 
 ### Correction to earlier notes
