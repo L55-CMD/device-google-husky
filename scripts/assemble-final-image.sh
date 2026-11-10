@@ -18,9 +18,6 @@ ota_dir="${OTA_DIR:-${repo_root}/ota-16}"
 artifacts_dir="${ARTIFACTS_DIR:-${repo_root}/artifacts}"
 work_dir="${WORK_DIR:-${repo_root}/workdir/forgejo-final}"
 
-package_registry_base="${PACKAGE_REGISTRY_BASE:?PACKAGE_REGISTRY_BASE is required}"
-package_branch="${PACKAGE_BRANCH:?PACKAGE_BRANCH is required}"
-
 require_url() {
     local url="$1"
     local status

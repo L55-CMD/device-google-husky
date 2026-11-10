@@ -28,6 +28,7 @@ if [ -n "${KERNEL_ZIP_SHA256:-}" ]; then
 fi
 unzip -oq "${archive}" -d "${kernel_dir}"
 
+# shellcheck disable=SC1091
 source "${repo_root}/deviceinfo"
 
 kernel_image="$(find "${kernel_dir}" -type f -name "${deviceinfo_kernel_image_name:-Image.lz4}" | head -n 1)"
