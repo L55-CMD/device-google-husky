@@ -26,11 +26,11 @@ Tag these revisions as `known-good-r8-20261110`. The port remains on the r8 kern
 
 ### Current defects
 
-1. Bottom screen region is fragmented and appears to mirror content from the top. Treat this as framebuffer wrap/stride/offset scanout corruption until proven otherwise.
+1. Bottom screen region is fragmented and appears to mirror content from the top. **Isolation results (2026-11-10 night):** present in all four Lomiri flag combinations (quirk/overlays matrix, see `bootdebug/flag-tests/MATRIX.md` on bring-up host); visible from the boot-splash window before Lomiri starts; unaffected by `vendor.display.preferred_mode` / `persist.vendor.display.primary.boot_config` props (composer3 HAL ignores them); unchanged at 1008x2244@120 in every test. DRM geometry is consistent (fb 1008x2256, plane 2244 lines @ +0+0, DSI-1 mode 1008x2244x120); dmesg shows clean panel bring-up with no underrun/DSC errors. All panel modes use DSC (HK3_FHD_DSC / HK3_WQHD_DSC). Working theory: compressed DSI stream ends before the last panel lines, leaving stale content in the bottom band. **Next: confirm whether LineageOS on the same kernel is clean (slot a boot), then bisect DSC/mode config.**
 2. Calls connect, but bidirectional call audio does not work; normal PulseAudio speaker/mic ports exist, while telephony patch routing is incomplete.
 3. Camera and Messaging open permission settings that expose no usable toggles. Camera confinement and trust-store startup are now fixed; remaining permission behavior needs retesting from a clean image.
 4. Lomiri's on-screen clock does not update even though the system clock advances.
-5. Wi-Fi, Bluetooth, sensors, camera capture, suspend/resume, charging states, and USB-C DisplayPort are not validated.
+5. Bluetooth, sensors, camera capture, suspend/resume, charging states, and USB-C DisplayPort are not validated. **Wi-Fi works (2026-11-10): phone joined LAN, SSH over Wi-Fi functional.**
 6. Camera/video acceleration remains blocked by the exynos MFC IOMMU fault; only the MFC node is masked.
 
 ### Required runtime fixes now in normal image
