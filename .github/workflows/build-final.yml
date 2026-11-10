@@ -99,6 +99,9 @@ jobs:
             vendor_boot.img \
             vendor_kernel_boot.img)
           (cd artifacts && split -b 1800m super.img "$(pwd)/../package/super.img.part-")
+          # The halium initrd expects the Android container rootfs on userdata
+          # as /android-rootfs.img; publish it so it can be pushed to the phone.
+          find workdir artifacts -name android-rootfs.img -exec cp {} package/ \; 2>/dev/null || true
 
       - name: Publish images.zip to rolling release
         env:
@@ -109,7 +112,9 @@ jobs:
           tag="latest-${branch_tag}"
           # Rolling release: recreate the tag so it always points at this build.
           gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "${tag}" package/boot-images.zip package/super.img.part-* \
+          assets=(package/boot-images.zip package/super.img.part-*)
+          [ -f package/android-rootfs.img ] && assets+=(package/android-rootfs.img)
+          gh release create "${tag}" "${assets[@]}" \
             --title "Latest build (${branch_tag})" \
             --notes "Rolling latest build for branch \`${branch_tag}\` (commit ${{ github.sha }})." \
             --latest=false
