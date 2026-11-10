@@ -6,6 +6,7 @@ if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
     exit 64
 fi
 
+repo_root="$(realpath "$(dirname "$0")/..")"
 source_url="$1"
 output_tar="$(realpath -m "$2")"
 work_dir="${3:-$(pwd)/workdir/package-halium-system}"
@@ -31,5 +32,15 @@ if [ -z "${system_img}" ]; then
     exit 1
 fi
 
-cp -f "${system_img}" "${staging_dir}/system/var/lib/lxc/android/android-rootfs.img"
+android_img="${staging_dir}/system/var/lib/lxc/android/android-rootfs.img"
+cp -f "${system_img}" "${android_img}"
+
+# The generic GSI has no first-stage device fstab. The Halium initrd reads
+# /fstab* from the Android rootfs to mount vendor and the other dynamic
+# partitions, so inject the files from the pinned LOS zuma vendor image.
+for fstab in fstab.zuma fstab.zuma-fips; do
+    debugfs -w -R "write ${repo_root}/android-rootfs/${fstab} /${fstab}" "${android_img}"
+done
+debugfs -R "stat /fstab.zuma" "${android_img}" >/dev/null
+
 tar -C "${staging_dir}" --owner=root --group=root -cJf "${output_tar}" system/

@@ -777,8 +777,8 @@ mountroot() {
 	[ $ANDROID_IMAGE_MODE = "system" ] && ANDROID_IMAGE="system.img" || ANDROID_IMAGE="android-rootfs.img"
 	[ -e /tmpmnt/.writable_device_image -o -e /halium-system/.writable_device_image ] && MOUNT="rw"
 	tell_kmsg "mounting android system image (/tmpmnt/$ANDROID_IMAGE) $MOUNT, in $MOUNT_LOCATION ($ANDROID_IMAGE_MODE mode)"
-	if [ $file_layout = "halium" ]; then
-		# rootfs.img and Android system.img are separate
+	if [ -f "/tmpmnt/$ANDROID_IMAGE" ]; then
+		# An explicitly supplied Android image on userdata takes precedence.
 		tell_kmsg "mounting android system image from userdata partition"
 		mount -o loop,$MOUNT "/tmpmnt/$ANDROID_IMAGE" $MOUNT_LOCATION
 	else

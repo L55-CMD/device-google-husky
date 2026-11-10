@@ -58,6 +58,10 @@ jobs:
           find overlay -type d -name '*.wants' | while read -r d; do
             find "$d" -maxdepth 1 -type f | while read -r f; do
               target=$(cat "$f")
+              if [[ -z "$target" || "$target" == *$'\n'* ]]; then
+                echo "Invalid systemd wants target in $f" >&2
+                exit 1
+              fi
               rm "$f"
               ln -s "$target" "$f"
             done
