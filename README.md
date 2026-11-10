@@ -35,6 +35,16 @@ CI publishes two rolling variants for every branch:
 
 Both variants include boot images, split `super.img`, Android rootfs, `SHA256SUMS`, and a `MANIFEST.txt` recording the coordinated device/kernel revisions and pinned dependency versions. See `BRINGUP.md` for flashing and verification.
 
+## First shell on a fresh debug flash
+
+Debug images force usb-moded rescue mode, whose sshd on port 8022 accepts publickey only, and `/userdata` may not carry an `authorized_keys` for the bring-up key. On a fresh flash, open the Terminal app on the device and paste (one line):
+
+```
+sudo sh -c 'mkdir -p /home/phablet/.ssh && echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAnvrzASLnD1GionxTigb/9oRZU92SCLEKuElJlwsabs husky-bringup" > /home/phablet/.ssh/authorized_keys && chown -R 32011:32011 /home/phablet/.ssh && chmod 700 /home/phablet/.ssh && chmod 600 /home/phablet/.ssh/authorized_keys && echo KEY-INSTALLED'
+```
+
+Expected output: `KEY-INSTALLED`. Afterwards SSH works from the bring-up host on `10.15.19.82:8022` with the `husky-rndis-key` private key (no password). The `chown 32011:32011` matters: the `phablet` user is UID/GID 32011, and sshd ignores `authorized_keys` with wrong ownership.
+
 ## Known-good baseline
 
 The r8 kernel baseline is coordinated across:
