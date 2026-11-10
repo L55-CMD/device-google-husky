@@ -16,11 +16,12 @@ fi
 
 docker run --rm --privileged \
     -e WORKSPACE_DIR="$(pwd)" \
-    -e BUILD_TOOLS_BRANCH="${BUILD_TOOLS_BRANCH:-unified-recovery}" \
-    -e BUILD_TOOLS_REPO="${BUILD_TOOLS_REPO:-https://gitlab.com/ubports/porting/community-ports/halium-generic-adaptation-build-tools.git}" \
     -e PACKAGE_REGISTRY_BASE="${PACKAGE_REGISTRY_BASE:-}" \
     -e KERNEL_REGISTRY_BASE="${KERNEL_REGISTRY_BASE:-}" \
     -e PACKAGE_BRANCH="${PACKAGE_BRANCH:-}" \
+    -e HUSKY_BUILD_VARIANT="${HUSKY_BUILD_VARIANT:-normal}" \
+    -e KERNEL_RELEASE_TAG="${KERNEL_RELEASE_TAG:-}" \
+    -e KERNEL_ZIP_SHA256="${KERNEL_ZIP_SHA256:-}" \
     "${docker_volumes[@]}" \
     -w "$(pwd)" \
     "${image_tag}" \

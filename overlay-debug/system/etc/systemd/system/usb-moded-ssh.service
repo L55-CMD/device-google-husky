@@ -1,0 +1,11 @@
+[Unit]
+Description=usb-moded rescue SSH server (debug key-only)
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/default/ssh
+ExecStart=/usr/sbin/sshd -D $SSHD_OPTS \
+    -o PasswordAuthentication=no \
+    -o KbdInteractiveAuthentication=no \
+    -o PermitRootLogin=no \
+    -o ListenAddress=10.15.19.82:8022

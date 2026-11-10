@@ -23,6 +23,9 @@ rm -rf "${kernel_dir}" "${kernel_obj_dir}" "${port_tree}" "${staging_dir}" "${tm
 mkdir -p "${kernel_dir}" "${kernel_obj_dir}/arch/arm64/boot" "${port_tree}" "${staging_dir}/partitions" "${staging_dir}/system" "${output_dir}" "${tmpdown}"
 
 curl -L --fail --output "${archive}" "${kernel_zip_url}"
+if [ -n "${KERNEL_ZIP_SHA256:-}" ]; then
+    echo "${KERNEL_ZIP_SHA256}  ${archive}" | sha256sum --check --quiet
+fi
 unzip -oq "${archive}" -d "${kernel_dir}"
 
 source "${repo_root}/deviceinfo"
@@ -41,6 +44,21 @@ tar -C "${repo_root}" \
     --exclude=ota-16 \
     --exclude=artifacts \
     -cf - . | tar -C "${port_tree}" -xf -
+
+build_variant="${HUSKY_BUILD_VARIANT:-normal}"
+case "${build_variant}" in
+    normal)
+        ;;
+    debug)
+        if [ -d "${repo_root}/overlay-debug" ]; then
+            cp -a "${repo_root}/overlay-debug/." "${port_tree}/overlay/"
+        fi
+        ;;
+    *)
+        echo "Unknown HUSKY_BUILD_VARIANT '${build_variant}'" >&2
+        exit 64
+        ;;
+esac
 
 dtb_img="$(find "${kernel_dir}" -type f -name 'dtb.img' | head -n 1)"
 if [ -z "${dtb_img}" ]; then
@@ -62,24 +80,22 @@ git_clone_if_missing() {
     git clone --depth 1 --branch "${branch}" "${url}" "${target}"
 }
 
-download_if_missing() {
+download_verified() {
     local url="$1"
     local target="$2"
-    if [ -f "${target}" ]; then
-        return
-    fi
-    curl -L --fail --output "${target}" "${url}"
+    local expected_sha256="$3"
+    curl -L --fail --output "${target}.part" "${url}"
+    mv "${target}.part" "${target}"
+    echo "${expected_sha256}  ${target}" | sha256sum --check --quiet
 }
 
 git_clone_if_missing "https://android.googlesource.com/platform/external/avb" "android13-gsi" "${tmpdown}/avb"
 git_clone_if_missing "https://github.com/LineageOS/android_system_tools_mkbootimg" "lineage-20.0" "${tmpdown}/android_system_tools_mkbootimg"
 
-download_if_missing \
-    "https://github.com/halium/initramfs-tools-halium/releases/download/dynparts/initrd.img-touch-arm64" \
-    "${tmpdown}/halium-boot-ramdisk.img"
-download_if_missing \
-    "https://ci.ubports.com/job/UBportsCommunityPortsJenkinsCI/job/ubports%2Fporting%2Fcommunity-ports%2Fjenkins-ci%2Fgeneric_arm64/job/halium-14.0/lastSuccessfulBuild/artifact/ramdisk-recovery.img" \
-    "${tmpdown}/ramdisk-recovery.img"
+download_verified "${INITRD_URL:?INITRD_URL is required}" \
+    "${tmpdown}/halium-boot-ramdisk.img" "${INITRD_SHA256:?INITRD_SHA256 is required}"
+download_verified "${RECOVERY_IMAGE_URL:?RECOVERY_IMAGE_URL is required}" \
+    "${tmpdown}/ramdisk-recovery.img" "${RECOVERY_IMAGE_SHA256:?RECOVERY_IMAGE_SHA256 is required}"
 
 if [[ -n "${deviceinfo_unified_recovery_ui_density:-}" && "${deviceinfo_unified_recovery_ui_density}" != "mdpi" ]]; then
     git_clone_if_missing "https://github.com/JamiKettunen/halium_bootable_recovery" "resource-updates" "${tmpdown}/halium_bootable_recovery"

@@ -20,6 +20,9 @@ rm -rf "${extract_dir}" "${staging_dir}"
 mkdir -p "${extract_dir}" "${staging_dir}/system/var/lib/lxc/android" "$(dirname "${output_tar}")"
 
 curl -L --fail --output "${archive}" "${source_url}"
+if [ -n "${SYSTEM_IMG_ZIP_SHA256:-}" ]; then
+    echo "${SYSTEM_IMG_ZIP_SHA256}  ${archive}" | sha256sum --check --quiet
+fi
 unzip -oq "${archive}" -d "${extract_dir}"
 
 system_img="$(find "${extract_dir}" -type f -name 'system.img' | head -n 1)"

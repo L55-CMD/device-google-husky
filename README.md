@@ -1,104 +1,65 @@
 # Ubuntu Touch for Google Pixel 8 Pro (husky)
 
-This is a port of Ubuntu Touch to the Google Pixel 8 Pro (codename husky, Tensor G3 / zuma),
-forked from the [Pixel 9a (tegu) port](https://git.deusch.me/ubports/device-google-tegu).
-Like its parent it is very much a work in progress.
+This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (Tensor G3, zuma), derived from the Pixel 9a/tegu bring-up. The port uses a Halium 16/Android 16 base with an Ubuntu 24.04-based Ubuntu Touch rootfs.
 
-## Status
+## Current verified state
 
-**Early bring-up. Nothing below is confirmed on husky yet.** The feature matrix from the
-tegu port is kept as a *target* checklist only; entries will be re-validated one by one on
-the Pixel 8 Pro (zuma differs from zumapro in touch, display, audio and sensor plumbing).
+| Area | Status |
+|---|---|
+| Boot to Lomiri | Working, with a bottom-region scanout artifact |
+| Touch | Basic UI interaction works |
+| Android container | Working |
+| Graphics/composer | Mali and composer3 initialize; panel handover works |
+| Mobile data | Working |
+| System clock/NTP | Working |
+| Calls | Connects; bidirectional call audio not working |
+| SMS | Permission flow needs retest on cleaned image |
+| Camera app | Permission/trust-store startup fixed; capture untested |
+| UI clock widget | Does not update despite correct system clock |
+| Wi-Fi / Bluetooth | Not validated |
+| Audio playback/microphone | Pulse devices exist; call routing incomplete |
+| Sensors / vibration | Not validated |
+| Camera/video acceleration | Blocked by exynos MFC IOMMU fault; node masked |
+| Suspend/resume / shutdown | Not fully validated |
+| USB-C DisplayPort | Not validated |
+| Recovery/offline charging | Not validated |
 
-|                                   |                                |                             |
-|-----------------------------------|--------------------------------|-----------------------------|
-| **Actors**                        | ❓ Battery lifetime            | **Network (cont.)**         |
-| ❓ Manual brightness              | ❓ Stability                   | ❓ Hotspot                  |
-| ❓ Torchlight                     |                                | ❓ NFC                      |
-| ❓ Vibration                      | **GPU**                        | ❓ WiFi                     |
-|                                   | ❓ Boot into UI                |                             |
-| **Camera**                        | ❓ Hardware video playback     | **Sensors**                 |
-| ❓ Flashlight                     |                                | ❓ Automatic brightness     |
-| ❓ Photo                          | **Misc**                       | ❓ Fingerprint reader       |
-| ❓ Video                          | ❓ AppArmor patches            | ❓ GPS                      |
-| ❓ Switching between cameras      | ❓ Battery percentage          | ❓ Proximity                |
-|                                   | ❓ Offline charging            | ❓ Rotation                 |
-| **Cellular**                      | ❓ Online charging             | ❓ Touchscreen              |
-| ❓ Carrier info, signal strength  | ❓ Wireless Charging           | ❓ Double touch to wake     |
-| ❓ Data connection                | ❓ Recovery image              |                             |
-| ❓ Dual SIM functionality         | ❓ Reset to factory defaults   | **Sound**                   |
-| ❓ Incoming, outgoing calls       | ❓ RTC time                    | ❓ Earphones                |
-| ❓ LTE calling (VoLTE)            | ❓ Wireless External monitor   | ❓ Loudspeaker              |
-| ❓ MMS in, out                    | ❓ Waydroid                    | ❓ Microphone               |
-| ❓ PIN unlock                     | ❓ KVM acceleration            | ❓ Volume control           |
-| ❓ SMS in, out                    |                                |                             |
-| ❓ Change audio routings          | **Network**                    |                             |
-| ❓ Voice in calls                 | ❓ Bluetooth                   | **USB**                     |
-| ❓ Volume control in calls        | ❓ Flight mode                 | ❓ MTP access               |
-|                                   |                                | ❓ ADB access               |
-|                                   |                                | ❓ Wired External monitor   |
+The bottom screen defect appears to mirror fragmented content from the top of the panel, so current investigation focuses on framebuffer stride/offset/wrap rather than UI scaling.
 
-✅ Working
-❌ Not Working
-⚠️ Partial
-❓ Untested / Unknown
+## Release layout
 
-Known tegu quirks that must be re-checked on husky during bring-up:
+CI publishes two rolling variants for every branch:
 
-- GTI touch co-processor edge filtering (`device-hacks` sysfs writes)
-- `aware_nmi*` NetworkManager rule
-- cs40l26 vibrator / hfd-service LED crash workaround
-- sensorfwd / bluebinder / AIDL HAL service names (`bcmbtlinux` etc.)
-- AIDL-only audio HAL (pulse `module-droid-card-aidl`)
-- USB-C DisplayPort (`usbdp_gbinder`, `exynos_drm.dp_rate=2`, UART disable)
+- `latest-<branch>-normal` — no bring-up instrumentation or forced rescue mode
+- `latest-<branch>-debug` — labelled debug image with temporary RNDIS rescue access and tracing
 
-## Differences from the tegu port
+Both variants include boot images, split `super.img`, Android rootfs, `SHA256SUMS`, and a `MANIFEST.txt` recording the coordinated device/kernel revisions and pinned dependency versions. See `BRINGUP.md` for flashing and verification.
 
-Same build pipeline and Halium 16/Android 16 base. Device-specific changes:
+## Known-good baseline
 
-- `deviceinfo`: codename `husky`, OS patch level matches the LineageOS 23.2 husky build,
-  `google-husky.dtb` placeholder (unused, populated from the kernel zip at build time —
-  the committed `google-tegu.dtb` was dropped for the same reason).
-- Recovery ramdisk: `init.recovery.husky.rc` / `init.recovery.zuma.rc` (zuma uses the same
-  `11210000.dwc3` USB controller and `13200000.ufs` boot device as zumapro).
-- Overlay: systemd units/ Drop-ins renamed `tegu-*` → `husky-*`; `build.prop`/`prop.halium`
-  device props set to `husky`; deviceinfo yaml for Lomiri shell scaling
-  (GridUnit 26 / DPR 2.75 — adjust after first boot).
-- Super partition layout is identical (`8531214336` bytes, group `8527020032`).
+The r8 kernel baseline is coordinated across:
 
-## Build
+- `lineage-kernel-manifest-husky` at `c71fde597bcf06374d26972c70f19c5e7f719d63`
+- `kernel-patches-husky` at `6d9a42798c9577508ee7dd227bb8976d05cac48e`
 
-Identical to tegu (see the [tegu README](https://git.deusch.me/ubports/device-google-tegu)
-for the full description):
+Tag `known-good-r8-20261110` preserves the tested device/kernel combination. A newer r12 kernel is not the baseline until its separate freeze is bisected.
 
-- The kernel is built by `lineage-kernel-manifest-husky` CI (LineageOS gs-6.1 zuma kernel
-  + halium patches from `kernel-patches-husky`) and published as `kernel.zip` to the
-  `generic/husky` package registry.
-- This repo's CI fetches the kernel, the Halium 16 GSI system image, the libhybris update
-  and a LineageOS 23.2 husky zip, repacks `boot.img`/`init_boot.img`/`vendor_boot.img`,
-  fuses `super.img` and publishes `images.zip` as a rolling release.
+## Important fixes in this tree
 
-> NOTE: the LineageOS zip URL in the CI config will rot once LineageOS drops the build
-> from its mirror (only the last ~3 builds are kept). Mirror it like the tegu zip on
-> `anubis.steffend.me` and update `LINEAGE_ZIP_URL`.
+- `kvm-arm.mode=protected` restores stock S2MPU behavior.
+- A DWC3 probe-defer fix allows OTG initialization instead of leaving the UDC unattached.
+- Lomiri waits for Android composer3 registration.
+- Container mount, APEX, AppArmor, `libgbinder`, `vndservicemanager`, and executable-mode packaging issues are fixed.
+- Debug framebuffer random-write tests are manual-only and absent from normal images.
 
-## Flashing
+## Security defaults
 
-Flash the latest **Android 16** stock image from Google first (both slots), then download
-`boot-images.zip` and all `super.img.part-*` files from [the releases](https://github.com/l55-cmd/device-google-husky/releases/tag/latest-main)
-(assets are split because of GitHub's 2 GB per-file limit), and from the bootloader:
+Normal images do not force USB rescue/developer mode or automatically enable SSH. SSH is key-only. Debug images are intended for isolated bring-up and must not be promoted as production defaults.
 
-```bash
-unzip boot-images.zip
-cat super.img.part-* > super.img
-fastboot flash boot boot.img
-fastboot flash dtbo dtbo.img
-fastboot flash init_boot init_boot.img
-fastboot flash vendor_boot vendor_boot.img
-fastboot flash vendor_kernel_boot vendor_kernel_boot.img
-fastboot flash super super.img
-fastboot erase userdata
-fastboot reboot
-```
+## Documentation
 
-For USB-C display testing later: `fastboot oem uart disable` (see the tegu port's issue #9).
+- `BRINGUP.md` — current build, release, checksum, and flashing workflow
+- `BRINGUP-LOG.md` — authoritative current state and ordered test queue
+- `BRINGUP-LOG-ARCHIVE.md` — summarized superseded diagnoses
+- `RESUME-NOTES.md` — current resume entry point
+- `dependencies.lock` — pinned third-party inputs and checksums

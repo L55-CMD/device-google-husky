@@ -48,6 +48,9 @@ if [ ! -f "${zip_cache}" ]; then
     curl -L --fail --output "${zip_cache}.part" "${lineage_zip_url}"
     mv "${zip_cache}.part" "${zip_cache}"
 fi
+if [ -n "${LINEAGE_ZIP_SHA256:-}" ]; then
+    echo "${LINEAGE_ZIP_SHA256}  ${zip_cache}" | sha256sum --check --quiet
+fi
 
 echo "==> Extracting payload.bin"
 rm -f "${payload_dir}/payload.bin"

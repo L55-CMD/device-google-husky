@@ -1,0 +1,13 @@
+[Unit]
+Description=Enable Husky debug rescue markers
+DefaultDependencies=no
+RequiresMountsFor=/userdata
+After=local-fs.target
+Before=force-adb.service usb-rescue-mode-off.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'rm -f /userdata/.force-adb; : > /userdata/.force-ssh; chmod 644 /userdata/.force-ssh'
+
+[Install]
+WantedBy=sysinit.target

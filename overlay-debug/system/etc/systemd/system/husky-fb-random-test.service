@@ -1,0 +1,7 @@
+[Unit]
+Description=Husky manual framebuffer random-write display test
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for fb in /dev/fb0 /dev/graphics/fb0; do [ -e "$fb" ] && dd if=/dev/urandom of="$fb" bs=1M count=16 >/dev/null 2>&1 && break; done'

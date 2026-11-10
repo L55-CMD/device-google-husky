@@ -7,10 +7,12 @@ on:
     paths:
       - 'build-patches/**'
       - 'overlay/**'
+      - 'overlay-debug/**'
       - 'ramdisk-overlay/**'
       - 'ramdisk-recovery-overlay/**'
       - 'scripts/**'
       - 'vendor-ramdisk-overlay/**'
+      - 'dependencies.lock'
       - 'bootconfig'
       - 'build.sh'
       - 'deviceinfo'
@@ -19,97 +21,147 @@ on:
   workflow_dispatch:
 
 env:
-  BUILD_TOOLS_BRANCH: main
-  BUILD_TOOLS_REPO: https://gitlab.com/ubports/porting/community-ports/halium-generic-adaptation-build-tools.git
-  # Packages (kernel.zip / system.img.zip / libhybris-16-update.tar.xz) are
-  # resolved from <base>/<branch>/<file> with fallback to <base>/main/<file>,
-  # which maps to release assets of the husky-packages repo.
   PACKAGE_REGISTRY_BASE: https://github.com/${{ github.repository_owner }}/husky-packages/releases/download
-  # kernel.zip is published by the kernel manifest CI into its own repo releases
   KERNEL_REGISTRY_BASE: https://github.com/${{ github.repository_owner }}/lineage-kernel-manifest-husky/releases/download
-  # Hosted as an asset of the husky-packages release (LOS only keeps the last
-  # ~3 builds on its own mirror, so we self-host it):
-  #   lineage-23.2-20261009-nightly-husky-signed.zip
-  #   sha256: 7b3cd1db0b76d043f4270a23c89e382894c955d77e2cc23b6f10986f7d2167a2
   LINEAGE_ZIP_URL: https://github.com/${{ github.repository_owner }}/husky-packages/releases/download/main/lineage-23.2-20261009-nightly-husky-signed.zip
 
 jobs:
-  final-artifacts:
+  preflight:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compute package branch
-        id: pkgbranch
+      - name: Shell syntax and ShellCheck
+        run: |
+          set -euo pipefail
+          find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          bash -n build.sh
+          shellcheck scripts/*.sh build.sh
+
+      - name: YAML validation
+        run: |
+          set -euo pipefail
+          python3 - .github/workflows/*.yml <<'PY'
+          import sys
+          try:
+              import yaml
+          except ImportError as exc:
+              raise SystemExit("PyYAML is required for workflow validation") from exc
+          for path in sys.argv[1:]:
+              with open(path, "r", encoding="utf-8") as handle:
+                  yaml.safe_load(handle)
+          PY
+
+      - name: Overlay validation
+        run: ./scripts/validate-overlay.sh
+
+  final-artifacts:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [normal, debug]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: build-final-${{ github.ref }}-${{ matrix.variant }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \
+                      /usr/lib/jvm /opt/hostedtoolcache 2>/dev/null || true
+          df -h /
+
+      - name: Compute package branch and resolve coordinated kernel
+        id: pkg
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           branch="$(printf '%s' "${{ github.ref_name }}" | sed 's#[^A-Za-z0-9_.-]#-#g')"
-          echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
+          tag="latest-${branch}"
+          kernel_release="$(gh api "repos/${{ github.repository_owner }}/lineage-kernel-manifest-husky/releases/tags/${tag}" \
+            --jq '.assets[] | select(.name == "kernel.zip") | .digest')"
+          case "${kernel_release}" in
+            sha256:*) kernel_release="${kernel_release#sha256:}" ;;
+            *) echo "kernel.zip digest missing for ${tag}" >&2; exit 1 ;;
+          esac
+          manifest_rev="$(gh api "repos/${{ github.repository_owner }}/lineage-kernel-manifest-husky/git/ref/heads/${{ github.ref_name }}" \
+            --jq '.object.sha')"
+          patches_rev="$(gh api "repos/${{ github.repository_owner }}/kernel-patches-husky/git/ref/heads/${{ github.ref_name }}" \
+            --jq '.object.sha')"
+          {
+            echo "branch=${branch}"
+            echo "kernel_tag=${tag}"
+            echo "kernel_sha256=${kernel_release}"
+            echo "manifest_rev=${manifest_rev}"
+            echo "patches_rev=${patches_rev}"
+          } >> "${GITHUB_OUTPUT}"
 
-      - name: Fix systemd wants symlinks
-        # Git stores these as plain files on Windows checkouts; systemd 255
-        # ignores non-symlink wants dropins, which silently disables every
-        # custom service (ssh, usbdp-gbinder, loggers).  Convert to symlinks.
+      - name: Normalize overlay links
         run: |
           set -euo pipefail
-          find overlay -type d -name '*.wants' | while read -r d; do
-            find "$d" -maxdepth 1 -type f | while read -r f; do
-              target=$(cat "$f")
-              if [[ -z "$target" || "$target" == *$'\n'* ]]; then
-                echo "Invalid systemd wants target in $f" >&2
-                exit 1
-              fi
-              rm "$f"
-              ln -s "$target" "$f"
+          for tree in overlay overlay-debug; do
+            [ -d "${tree}" ] || continue
+            find "${tree}" -type d -name '*.wants' | while read -r d; do
+              find "$d" -maxdepth 1 -type f | while read -r f; do
+                target="$(cat "$f")"
+                if [[ -z "${target}" || "${target}" == *$'\n'* ]]; then
+                  echo "Invalid systemd wants target in $f" >&2
+                  exit 1
+                fi
+                rm "$f"
+                ln -s "$target" "$f"
+              done
             done
           done
-
-      - name: Fix overlay library symlinks
-        # Windows checkouts also turn these soname links into plain text files.
-        run: |
-          set -euo pipefail
           for f in \
             overlay/system/usr/lib/aarch64-linux-gnu/libgbinder.so.1 \
             overlay/system/usr/lib/aarch64-linux-gnu/libgbinder.so.1.1 \
             overlay/system/usr/lib/aarch64-linux-gnu/libgbinder-radio.so.1 \
             overlay/system/usr/lib/aarch64-linux-gnu/libgbinder-radio.so.1.6; do
-            target=$(cat "$f")
+            target="$(cat "$f")"
             rm "$f"
             ln -s "$target" "$f"
           done
 
-      - name: Build final Ubuntu Touch artifacts in Docker
+      - name: Build ${{ matrix.variant }} Ubuntu Touch artifacts in Docker
         env:
           IMAGE_TAG: husky-final-builder:ci
-          PACKAGE_BRANCH: ${{ steps.pkgbranch.outputs.branch }}
+          HUSKY_BUILD_VARIANT: ${{ matrix.variant }}
+          PACKAGE_BRANCH: ${{ steps.pkg.outputs.branch }}
+          KERNEL_RELEASE_TAG: ${{ steps.pkg.outputs.kernel_tag }}
+          KERNEL_ZIP_SHA256: ${{ steps.pkg.outputs.kernel_sha256 }}
         run: ./scripts/run-docker-build.sh
 
-      - name: Build super.img
+      - name: Build ${{ matrix.variant }} super.img
         run: |
           set -euo pipefail
-          # lpmake/simg2img come from the alpine android-tools package;
-          # run the whole step inside a throwaway container.
+          source dependencies.lock
           docker run --rm \
+            -e LINEAGE_ZIP_SHA256="${LINEAGE_ZIP_SHA256}" \
             -v "$(pwd):$(pwd)" -w "$(pwd)" \
             -v /var/run/docker.sock:/var/run/docker.sock \
             alpine:3.20 \
-            sh -c "apk add --no-cache android-tools curl unzip coreutils bash docker-cli >/dev/null && \
+            sh -c "apk add --no-cache android-tools curl unzip coreutils bash docker-cli e2fsprogs >/dev/null && \
                    ./scripts/build-super-image.sh \
                      '${LINEAGE_ZIP_URL}' \
                      '$(pwd)/artifacts' \
                      '$(pwd)/artifacts/super.img' \
-                     '$(pwd)/workdir/super' && \
-                   (cd artifacts && sha256sum super.img >> SHA256SUMS)"
+                     '$(pwd)/workdir/super'"
 
-      - name: Package images
+      - name: Package ${{ matrix.variant }} images
         run: |
           set -euo pipefail
+          source dependencies.lock
           mkdir -p package
-          # GitHub release assets are capped at 2 GB each, so boot images and
-          # super.img ship separately; super.img is split into parts.
           (cd artifacts && zip -j "$(pwd)/../package/boot-images.zip" \
             boot.img \
             dtbo.img \
@@ -117,22 +169,46 @@ jobs:
             vendor_boot.img \
             vendor_kernel_boot.img)
           (cd artifacts && split -b 1800m super.img "$(pwd)/../package/super.img.part-")
-          # The halium initrd expects the Android container rootfs on userdata
-          # as /android-rootfs.img; publish it so it can be pushed to the phone.
-          find workdir artifacts -name android-rootfs.img -exec cp {} package/ \; 2>/dev/null || true
+          cp -f artifacts/android-rootfs.img package/android-rootfs.img
+          cat > package/MANIFEST.txt <<EOF
+          husky build manifest
+          ====================
+          build_variant: ${{ matrix.variant }}
+          device_repository: ${{ github.repository }}
+          device_branch: ${{ github.ref_name }}
+          device_revision: ${{ github.sha }}
+          kernel_release_tag: ${{ steps.pkg.outputs.kernel_tag }}
+          kernel_manifest_repository: ${{ github.repository_owner }}/lineage-kernel-manifest-husky
+          kernel_manifest_branch: ${{ github.ref_name }}
+          kernel_manifest_revision: ${{ steps.pkg.outputs.manifest_rev }}
+          kernel_patches_repository: ${{ github.repository_owner }}/kernel-patches-husky
+          kernel_patches_branch: ${{ github.ref_name }}
+          kernel_patches_revision: ${{ steps.pkg.outputs.patches_rev }}
+          build_tools_repository: ${BUILD_TOOLS_REPO}
+          build_tools_revision: ${BUILD_TOOLS_REVISION}
+          halium_system_file: ${HALIUM_SYSTEM_FILE}
+          halium_system_sha256: ${HALIUM_SYSTEM_SHA256}
+          libhybris_file: ${LIBHYBRIS_FILE}
+          libhybris_sha256: ${LIBHYBRIS_SHA256}
+          lineage_zip_file: ${LINEAGE_ZIP_FILE}
+          lineage_zip_url: ${LINEAGE_ZIP_URL}
+          lineage_zip_sha256: ${LINEAGE_ZIP_SHA256}
+          initrd_url: ${INITRD_URL}
+          initrd_sha256: ${INITRD_SHA256}
+          recovery_image_url: ${RECOVERY_IMAGE_URL}
+          recovery_image_sha256: ${RECOVERY_IMAGE_SHA256}
+          EOF
+          (cd package && sha256sum boot-images.zip super.img.part-* android-rootfs.img MANIFEST.txt > SHA256SUMS)
 
-      - name: Publish images.zip to rolling release
+      - name: Publish ${{ matrix.variant }} rolling release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           branch_tag="$(printf '%s' "${{ github.ref_name }}" | sed 's#[^A-Za-z0-9_.-]#-#g')"
-          tag="latest-${branch_tag}"
-          # Rolling release: recreate the tag so it always points at this build.
+          tag="latest-${branch_tag}-${{ matrix.variant }}"
           gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
-          assets=(package/boot-images.zip package/super.img.part-*)
-          [ -f package/android-rootfs.img ] && assets+=(package/android-rootfs.img)
-          gh release create "${tag}" "${assets[@]}" \
-            --title "Latest build (${branch_tag})" \
-            --notes "Rolling latest build for branch \`${branch_tag}\` (commit ${{ github.sha }})." \
+          gh release create "${tag}" package/* \
+            --title "Latest ${{ matrix.variant }} build (${branch_tag})" \
+            --notes "Rolling ${{ matrix.variant }} build for branch \`${branch_tag}\` (device commit ${{ github.sha }})." \
             --latest=false

@@ -1,0 +1,15 @@
+# Coordinated third-party inputs for husky device images.
+BUILD_TOOLS_REPO=https://gitlab.com/ubports/porting/community-ports/halium-generic-adaptation-build-tools.git
+BUILD_TOOLS_REVISION=262bf2c97906058f0ce5276c354f13a05a6d7400
+
+HALIUM_SYSTEM_FILE=system.img.zip
+HALIUM_SYSTEM_SHA256=fa4c8c14cb8308b3ea50e228ab602f028081830fb696d539cd3aebfd331c2753
+LIBHYBRIS_FILE=libhybris-16-update.tar.xz
+LIBHYBRIS_SHA256=3926267977b7bce6d282922d1ee0e1fcc470f4b68d7894b29f7cdd9c44a3f238
+
+LINEAGE_ZIP_FILE=lineage-23.2-20261009-nightly-husky-signed.zip
+LINEAGE_ZIP_SHA256=7b3cd1db0b76d043f4270a23c89e382894c955d77e2cc23b6f10986f7d2167a2
+INITRD_URL=https://github.com/halium/initramfs-tools-halium/releases/download/dynparts/initrd.img-touch-arm64
+INITRD_SHA256=da1073d025e3ffca88b70463841509260e364771ce0733ed76a0b6eaf7eedc8e
+RECOVERY_IMAGE_URL=https://ci.ubports.com/job/UBportsCommunityPortsJenkinsCI/job/ubports%2Fporting%2Fcommunity-ports%2Fjenkins-ci%2Fgeneric_arm64/job/halium-14.0/lastSuccessfulBuild/artifact/ramdisk-recovery.img
+RECOVERY_IMAGE_SHA256=c9c32a413b9e23a9b4ec1e0daba4e009ec485404590b74ef93059db22efaca40

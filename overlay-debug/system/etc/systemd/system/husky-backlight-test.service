@@ -1,0 +1,7 @@
+[Unit]
+Description=Husky manual backlight blink test
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'B=$(ls /sys/class/backlight/*/brightness 2>/dev/null | head -1); [ -n "$B" ] || exit 0; M=$(cat /sys/class/backlight/max_brightness 2>/dev/null || echo 255); for i in 1 2 3 4; do echo 0 > "$B" 2>/dev/null; sleep 0.4; echo "$M" > "$B" 2>/dev/null; sleep 0.5; done'

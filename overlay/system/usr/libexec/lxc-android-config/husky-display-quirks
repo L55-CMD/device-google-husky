@@ -1,10 +1,31 @@
 #!/bin/sh
 set -e
 
-# gst-plugin-scan currently triggers a fatal MFC IOMMU fault on husky.
-# Keep V4L2 video nodes unusable until the driver/IOMMU path is fixed.
-for dev in /dev/video*; do
-    if [ -e "$dev" ]; then
-        mount --bind /dev/null "$dev"
-    fi
+# gst-plugin-scan currently triggers a fatal exynos MFC IOMMU fault on husky.
+# Keep only the MFC V4L2 nodes unusable until the driver/IOMMU path is fixed.
+for meta in /sys/class/video4linux/video*; do
+    [ -e "${meta}/name" ] || continue
+    name="$(tr '[:upper:]' '[:lower:]' < "${meta}/name")"
+    case "${name}" in
+        *exynos*mfc*|*s5p*mfc*|*mfc*)
+            dev="/dev/${meta##*/}"
+            if [ -e "${dev}" ]; then
+                mount --bind /dev/null "${dev}"
+            fi
+            ;;
+    esac
+done
+
+# The packaged Mir client platform is not executable, which breaks user-session
+# Mir clients such as trust-store and mirout. Bind an executable copy from
+# userdata until the rootfs package mode is fixed.
+for src in /usr/lib/aarch64-linux-gnu/mir1/client-platform/android2.so.*; do
+    [ -e "${src}" ] || continue
+    [ -x "${src}" ] && continue
+    mountpoint -q "${src}" 2>/dev/null && continue
+    dst="/userdata/.husky-$(basename "${src}")"
+    cp -f "${src}" "${dst}.tmp"
+    chmod 755 "${dst}.tmp"
+    mv "${dst}.tmp" "${dst}"
+    mount --bind "${dst}" "${src}"
 done
