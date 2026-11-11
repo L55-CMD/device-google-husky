@@ -7,24 +7,28 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 | Area | Status |
 |---|---|
 | Boot to Lomiri | Working, with a bottom-region scanout artifact |
-| Touch | Basic UI interaction works |
+| Boot/reboot stability | Working (many deliberate reboots and session restarts during bring-up) |
+| Touch | Working, including edge gestures and app drawer |
+| Terminal app / Morph browser | Working (used for on-device setup and downloads) |
 | Android container | Working |
-| Graphics/composer | Mali and composer3 initialize; panel handover works |
+| Graphics/composer | Mali and composer3 initialize; panel handover works; `--enable-num-framebuffers-quirk=true` required for tear-free interaction |
 | Mobile data | Working |
 | System clock/NTP | Working |
+| Wi-Fi | Working (validated 2026-11-10: joins WPA2 LAN, sustained SSH over Wi-Fi) |
+| Bluetooth | Not validated |
+| SSH access | Working on debug images via bring-up key (RNDIS `10.15.19.82`, also Wi-Fi); normal images are key-only and must not expose rescue mode |
 | Calls | Connects; bidirectional call audio not working |
-| SMS | Permission flow needs retest on cleaned image |
-| Camera app | Permission/trust-store startup fixed; capture untested |
+| SMS | Permission flow needs retest on cleaned image (trust-store fix is now in-image) |
+| Camera app | Permission/trust-store startup fixed in image; capture untested |
 | UI clock widget | Does not update despite correct system clock |
-| Wi-Fi / Bluetooth | Not validated |
 | Audio playback/microphone | Pulse devices exist; call routing incomplete |
 | Sensors / vibration | Not validated |
 | Camera/video acceleration | Blocked by exynos MFC IOMMU fault; node masked |
-| Suspend/resume / shutdown | Not fully validated |
+| Suspend/resume / shutdown | Not validated (reboots are stable; suspend untested) |
 | USB-C DisplayPort | Not validated |
 | Recovery/offline charging | Not validated |
 
-The bottom screen defect appears to mirror fragmented content from the top of the panel, so current investigation focuses on framebuffer stride/offset/wrap rather than UI scaling.
+The bottom screen defect appears to mirror fragmented content from the top of the panel. A full Lomiri flag matrix (framebuffer-count quirk × overlay disable, four combinations) showed the artifact is **independent of both compositor flags** — investigation now focuses on the DSC-compressed DSI stream and panel scanout, not UI scaling. Defaults remain quirk on + overlays off per the matrix findings. Evidence: bring-up host `flag-tests/` bundle (see `docs/HANDOVER.md` §5).
 
 ## Release layout
 
