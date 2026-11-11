@@ -48,8 +48,8 @@ brief. It complements `BRINGUP-LOG.md` (defect list + fixes) and the README
 
 ## 3. Device access playbook (hard-won, read before touching the phone)
 
-Phone: Pixel 8 Pro, serial `38111FDJG001WM`, normally slot **b**.
-Host tools: `~/platform-tools/{adb,fastboot}.exe` (Git Bash on Windows).
+Phone: Pixel 8 Pro (verify identity with `fastboot getvar product` before every flash; do not publish the serial), normally slot **b**.
+Host: Windows + Git Bash; adb/fastboot live on the bring-up host (not in this repo).
 
 - **Fastboot:** Power+Vol Down at boot. Verify `fastboot devices` shows the
   serial before every flash.
@@ -57,7 +57,7 @@ Host tools: `~/platform-tools/{adb,fastboot}.exe` (Git Bash on Windows).
   `init_boot`, `vendor_boot`, `vendor_kernel_boot`, `dtbo` from
   `boot-images.zip`; `fastboot flash super super.img` (reassembled from parts,
   verify `SHA256SUMS` first); `fastboot reboot`. Full sequence lives in
-  `~/bootdebug/reflash-super.sh`.
+  `reflash-super.sh` (bring-up host).
 - **First shell after a fresh debug flash** (documented in README):
   rescue sshd on `10.15.19.82:8022` accepts **publickey only** (usb-moded
   rescue mode spawns it; our own `usb-moded-ssh.service` fights for the same
@@ -66,7 +66,7 @@ Host tools: `~/platform-tools/{adb,fastboot}.exe` (Git Bash on Windows).
   `docs/phone-first-shell/key.sh` from raw.githubusercontent (browser copy of
   long commands is unreliable; PC-hosted HTTP doesn't reach the phone through
   Windows firewall).
-- **Bring-up key:** private `~/bootdebug/husky-rndis-key` (pubkey in
+- **Bring-up key:** private `husky-rndis-key` on the bring-up host (pubkey in
   `docs/phone-first-shell/key.sh`). `authorized_keys` must be
   `chown 32011:32011` (phablet is UID 32011, not 1000). It lives in
   `/userdata` → survives reflashes.
@@ -85,18 +85,18 @@ Host tools: `~/platform-tools/{adb,fastboot}.exe` (Git Bash on Windows).
   at restart, so editing the wrapper never sticks. What **does** stick:
   bind-mount a file over `/etc/default/lsc-wrapper.d/50-default.conf` (the
   wrapper sources that dir *after* its built-in `LSC_FLAGS`, last wins).
-  Harness: `~/bootdebug/flag-test.py <label> <quirk:on|off> <overlays:on|off>`
+  Harness: `flag-test.py <label> <quirk:on|off> <overlays:on|off>` (bring-up host)
   does exactly this + restarts lightdm.
 - Restarting lightdm drops networking for ~30–60s (both RNDIS and Wi-Fi);
   wait and retry all channels.
-- **Recovery** (pstore, last_kmsg): flash LOS stack (`~/husky-verify`) →
+- **Recovery** (pstore, last_kmsg): flash the archived LOS stack (bring-up host) →
   recovery → Advanced → Enable ADB → mount userdata → pull logs. See
   `BRINGUP.md`.
 
 ## 4. Token / credential hygiene (ACTION REQUIRED)
 
-The GitHub PAT used for API/git access sits in `~/bootdebug/watch-ci.sh` and
-**appeared in plain text in tool output**. It must be **revoked on GitHub**
+The GitHub PAT used for API/git access is stored only on the bring-up host and
+**appeared in plain text in session tool output**. It must be **revoked on GitHub**
 (`Settings → Developer settings → Personal access tokens`) once CI use is
 done, and replaced with a fresh token stored outside the repo/docs. No token
 may be committed to the repos (roadmap SAFE-029 / Phase 0 gate).
@@ -106,8 +106,8 @@ may be committed to the repos (roadmap SAFE-029 / Phase 0 gate).
 Symptom: bottom ~1 inch of the panel shows a persistent fragmented **mirror of
 top-of-screen content**; visible from the boot-splash window (before Lomiri),
 constant across all UI activity. Evidence bundle:
-`~/bootdebug/flag-tests/` (MATRIX.md, per-test DRM state, compositor logs,
-props; bring-up host).
+the bring-up host's `flag-tests/` evidence bundle (MATRIX.md, per-test DRM
+state, compositor logs, props).
 
 Established facts:
 - **Independent of Lomiri flags.** Full quirk×overlays matrix (A–D) run:
@@ -180,13 +180,12 @@ any image that leaves your bench).
 
 ## 8. How to resume each thread
 
-- **Display:** §5 checklist; all tooling on bring-up host (`~/bootdebug/`).
+- **Display:** §5 checklist; all tooling on the bring-up host.
 - **New device-repo change:** commit on `cleanup-r8-baseline`, push, watch run
-  via `~/bootdebug/watch-ci-safe.sh <run-id>` (run id from the API), download
-  from the rolling release, `~/bootdebug/reflash-super.sh` pattern (super-only
-  if boot images unchanged).
+  via `watch-ci-safe.sh <run-id>` (bring-up host) (run id from the API), download
+  from the rolling release, `reflash-super.sh` pattern (super-only if boot images unchanged).
 - **Kernel change:** commit patch in `kernel-patches-husky` (see its README +
   `apply-patches.sh`), push branch (triggers kernel CI, hours), then device CI
   picks the new kernel.zip automatically.
-- **Validation runs:** SSH helper pattern in `~/bootdebug/flag-test.py`
+- **Validation runs:** SSH helper pattern in `flag-test.py` (bring-up host)
   (paramiko, multi-channel connect, `sudo -S` with empty password).
