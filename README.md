@@ -71,5 +71,6 @@ Normal images do not force USB rescue/developer mode or automatically enable SSH
 - `BRINGUP.md` — current build, release, checksum, and flashing workflow
 - `BRINGUP-LOG.md` — authoritative current state and ordered test queue
 - `BRINGUP-LOG-ARCHIVE.md` — summarized superseded diagnoses
+- `docs/HANDOVER.md` — session handover: status snapshot, device access playbook, active investigations, roadmap progress
 - `RESUME-NOTES.md` — current resume entry point
 - `dependencies.lock` — pinned third-party inputs and checksums
