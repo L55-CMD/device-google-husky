@@ -116,6 +116,16 @@ download_verified "${INITRD_URL:?INITRD_URL is required}" \
 download_verified "${RECOVERY_IMAGE_URL:?RECOVERY_IMAGE_URL is required}" \
     "${tmpdown}/ramdisk-recovery.img" "${RECOVERY_IMAGE_SHA256:?RECOVERY_IMAGE_SHA256 is required}"
 
+# pKVM protected modules (exynos-pd, pkvm_s2mpu-v9) must load before pKVM
+# finalizes; the kernel modprobes them from the boot ramdisk at boot
+# (see BRINGUP-LOG, defect: YouTube/MFC NULL-IOMMU-domain panic). Append
+# the module segment to the halium ramdisk; concatenated cpio segments
+# are unpacked in order.
+"${repo_root}/scripts/make-pkvm-ramdisk-segment.sh" \
+    "${kernel_dir}" "${tmpdown}/pkvm-modules.cpio"
+cat "${tmpdown}/halium-boot-ramdisk.img" "${tmpdown}/pkvm-modules.cpio" \
+    > "${tmpdown}/halium-boot-ramdisk-pkvm.img"
+
 if [[ -n "${deviceinfo_unified_recovery_ui_density:-}" && "${deviceinfo_unified_recovery_ui_density}" != "mdpi" ]]; then
     git_clone_if_missing "https://github.com/JamiKettunen/halium_bootable_recovery" "resource-updates" "${tmpdown}/halium_bootable_recovery"
 fi
@@ -127,7 +137,7 @@ cp -f "${kernel_image}" "${kernel_obj_dir}/arch/arm64/boot/${deviceinfo_kernel_i
     "${repo_root}/build/make-bootimage.sh" \
         "${tmpdown}" \
         "${kernel_obj_dir}" \
-        "${tmpdown}/halium-boot-ramdisk.img" \
+        "${tmpdown}/halium-boot-ramdisk-pkvm.img" \
         "${staging_dir}/partitions/boot.img" \
         "${staging_dir}/system"
 )

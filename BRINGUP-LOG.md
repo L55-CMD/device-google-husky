@@ -57,6 +57,41 @@ Tag these revisions as `known-good-r8-20261110`. The port remains on the r8 kern
 
 ## 2026-11-12 update
 
+### YouTube playback reboots the phone — root cause FOUND (defect #6 escalated)
+
+Playing any YouTube video in morph-browser kernel-panics and reboots.
+ramoops (saved: `husky-verify/ramoops-full.{bin,txt}`) shows:
+
+- Crash: `Comm: binder:332_1` (codec2) in `mfc_open` ->
+  `mfc_iommu_map_firmware` -> `iommu_map_sg(domain=NULL)` -> NULL+8 deref
+  -> panic. MFC device has NO IOMMU domain.
+- Same boot's earlier shutdown also panicked in `iommu_release_device`
+  (same NULL-domain family).
+
+Chain: MFC platform device has `samsung,iommu-group = <&iommu_group_mfc>`;
+the group driver (sysmmu-group) probed, but NOT ONE samsung SysMMU bound a
+driver (`*.sysmmu` devices unbound; only pcie-sysmmu). Root cause:
+**`samsung_iommu_v9.ko` is never loaded.** Verified against the rolling
+kernel release (`test-r8-lazylink/kernel.zip`, Nov 10 14:21 — the exact
+image on the phone): the module IS built and packaged in
+vendor_dlkm.flatten.img (274 modules; modules.dep + modalias correct:
+`samsung,sysmmu-v9` -> `samsung_iommu_v9`), and
+`zuma_defconfig` has CONFIG_SAMSUNG_IOMMU_V9=m, but the boot-time load
+lists (modules.load 63 lines, husky insmod cfg 5 modules) do not include
+it, and no uevent/modalias autoload reaches it. `exynos_mfc` gets
+modprobed by the codec path and lands domain-less.
+
+Fix (queued, one-liner class): load `samsung_iommu_v9` at container
+start (device-hacks modprobe once vendor_dlkm is mounted), or add to the
+insmod cfg. Live test: modprobe it, confirm `*.sysmmu` bind, unmask MFC
+nodes, play YouTube. Likely also fixes the shutdown
+`iommu_release_device` panic. NOT a defect in the s2mpu lazy-link
+patches after all — the earlier suspicion is retracted; those patches
+touched USB-GSA S2MPU, unrelated to the media SysMMU group.
+
+Live mitigation applied on the phone until the fix ships: container MFC
+nodes `chmod 000` (software decode fallback; survives until reboot only).
+
 ### Display experiments (kernel CI, queued — branches prepared, not yet pushed)
 
 - `test-display-force60` (kernel-patches + manifest): hides both 120Hz
