@@ -1,14 +1,37 @@
 # Husky port — session handover (2026-11-10/11)
 
-> **2026-11-12 addendum (offline session — nothing pushed):**
-> display experiment branches prepared (`test-display-force60`,
-> `test-display-wqhd`); call-audio **root cause found** (GSI strips the
-> framework audio stack; `minimediaservice` registers the dead
-> `media.audio_policy` stub) with a fully assembled, validated restore
-> overlay now sitting in the device-repo working tree (uncommitted);
-> live-injection test kit requires only an SSH-connected phone — no
-> reflash. Details: `BRINGUP-LOG.md` 2026-11-12 section and
-> `husky-verify/audio-20261112/NOTES.md`.
+> **2026-11-12 addendum #2 (push day + YouTube-crash fix — READ FIRST):**
+> ALL of addendum #1 is now PUSHED and building on CI:
+> - `test-display-force60` + `test-display-wqhd`: kernel experiment
+>   branches (kernel-patches `5fec8a3`/`db8e90b`, manifest
+>   `496a30e`/`976be53`) → rolling `*/kernel.zip` when CI finishes.
+> - `test-audio-restore` (device repo `19f85ff` + `ea99c53`): framework
+>   audio restore overlay (defect #2) AND the pKVM ramdisk injection
+>   (defect #6 / YouTube reboot fix).
+> **YouTube crash root cause (fully verified):** MFC opens with a NULL
+> IOMMU domain → `iommu_map_sg(NULL)` → panic. Chain: pKVM-protected
+> `pkvm_s2mpu-v9` must load from the boot ramdisk before pKVM finalize;
+> the halium initramfs has no vendor modules → early load fails →
+> `samsung_iommu_v9` can never resolve `pkvm_s2mpu_of_link_v9` → no
+> SysMMU binds → MFC domainless. Fix: `scripts/make-pkvm-ramdisk-
+> segment.sh` injects the protected modules + 25-module dep closure as
+> a cpio segment into the boot ramdisk. Full analysis:
+> `husky-verify/YOUTUBE-CRASH-ANALYSIS.md`.
+> **Next session:** wait for device CI image, then verify in order:
+> (1) `lsmod | grep samsung_iommu` + sysmmu driver bindings, (2) YouTube
+> playback, (3) camera capture, (4) clean shutdown, (5) call audio per
+> `husky-verify/audio-20261112/call-test.md`, (6) flash force60/wqhd
+> kernel zips and run `husky-verify/display-experiment-check.sh`.
+> Phone RNDIS (10.15.19.82, key `bootdebug/husky-rndis-key`, empty sudo
+> pw) drops often — retry loops are in `husky-verify/wait-for-phone.sh`.
+
+> **2026-11-12 addendum #1 (offline session — SUPERSEDED by #2, kept for
+> history):** display experiment branches prepared; call-audio root
+> cause found (GSI strips the framework audio stack; `minimediaservice`
+> registers the dead `media.audio_policy` stub) with a fully assembled,
+> validated restore overlay; live-injection test kit requires only an
+> SSH-connected phone — no reflash. Details: `BRINGUP-LOG.md`
+> 2026-11-12 section and `husky-verify/audio-20261112/NOTES.md`.
 
 > **2026-11-11 late session addendum (display + call audio):** see §5 for
 display-artifact results (kernel side exonerated, slot-a dead, next: LOS flash
