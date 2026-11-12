@@ -55,6 +55,47 @@ Tag these revisions as `known-good-r8-20261110`. The port remains on the r8 kern
 - Do not reintroduce automatic framebuffer random writes, infinite vibrator heartbeats, or unconditional `/dev/video*` masking.
 - Superseded diagnoses are summarized in `BRINGUP-LOG-ARCHIVE.md`.
 
+## 2026-11-12 update
+
+### Display experiments (kernel CI, queued — branches prepared, not yet pushed)
+
+- `test-display-force60` (kernel-patches + manifest): hides both 120Hz
+  HK3 modes → panel exposes only 1344x2992x60 + 1008x2244x60.
+  Isolates refresh rate / TE2 / op-hs as the artifact cause.
+- `test-display-wqhd` (alternative branch): hides FHD + WQHD120 →
+  WQHD60 only. Isolates the FHD DSC path.
+- Both are `#if 0` toggle patches on `panel-google-hk3.c` (the driver
+  actually bound via `google,hk3` compatible; `panel-gs-hk3.c` is NOT
+  used by husky). Kernel side exonerated by 2026-11-11 register audit.
+- Audit side-note: `hk3_init` hardcodes the WQHD CASET/PASET address
+  window for FHD too — but the `gs_` rewrite (panel-gs-hk3.c) does the
+  same and ships in Android, so it is NOT a plausible artifact cause.
+  Deprioritized; the force-60Hz and WQHD experiments come first.
+
+### Defect #2 (call audio) — root cause found offline
+
+The Halium 16 GSI ships with the framework audio stack stripped:
+no `/system/bin/audioserver`, no `audioserver.rc`, no audio libs
+(libaudioflinger*, libaudiopolicy*), no audio_policy_configuration.xml;
+the GSI init.rc's `service audioserver` definition is scrubbed
+(the `mkdir /data/misc/audioserver` remains). `/system/bin/
+minimediaservice` registers the dead `media.audio_policy` stub
+(`media.audio_policy` string present in its binary). Fix candidate #1
+from 2026-11-11 is therefore answered: the real AudioPolicyService
+cannot run from this image as-is.
+
+Restore overlay ASSEMBLED + validated (24 files, 6.7 MB): audioserver
++ rc + 18 closure libs from the LOS 23.2 system image, audio policy
+config (AOSP primary module, telephony routing intact, non-essential
+XIncludes stripped) + volume tables + audio_effects.xml. Injection via
+the existing pre-start halium-overlay rsync (fixup-overlay-husky runs
+Before=lxc-android-config.service, so init parses the restored rc).
+A16 FactoryHal auto-prefers the AIDL IModule (verified in AOSP source),
+so halVersion="3.0" in the config is harmless. Staging:
+bring-up host `work/audio-restore/overlay-root/`, evidence
+`husky-verify/audio-20261112/NOTES.md`. Not yet committed to the device
+repo.
+
 ## Next display tests
 
 Run each configuration from a clean boot or a LightDM restart, and record a photo, compositor log, composer3 logcat, and DRM state:

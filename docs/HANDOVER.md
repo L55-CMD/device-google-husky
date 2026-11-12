@@ -1,5 +1,22 @@
 # Husky port — session handover (2026-11-10/11)
 
+> **2026-11-12 addendum (offline session — nothing pushed):**
+> display experiment branches prepared (`test-display-force60`,
+> `test-display-wqhd`); call-audio **root cause found** (GSI strips the
+> framework audio stack; `minimediaservice` registers the dead
+> `media.audio_policy` stub) with a fully assembled, validated restore
+> overlay now sitting in the device-repo working tree (uncommitted);
+> live-injection test kit requires only an SSH-connected phone — no
+> reflash. Details: `BRINGUP-LOG.md` 2026-11-12 section and
+> `husky-verify/audio-20261112/NOTES.md`.
+
+> **2026-11-11 late session addendum (display + call audio):** see §5 for
+display-artifact results (kernel side exonerated, slot-a dead, next: LOS flash
+or kernel mode patch) and **§9 for the call-audio workstream** (root cause
+found: dead media.audio_policy stub + missing telephony patch driver; working
+ITelephony mode-switch tooling built). Evidence bundles:
+`husky-verify/evidence-20261111-display/` and `husky-verify/audio-20261111/`.
+
 This document is the authoritative "where are we and how do I touch the phone"
 brief. It complements `BRINGUP-LOG.md` (defect list + fixes) and the README
 (status matrix). Update all three when state changes.
@@ -127,6 +144,42 @@ Established facts:
   The same kernel DT + panel driver are believed clean under Android, but this
   is unverified.
 
+Working theory: the compressed DSI stream is short by roughly the
+corrupted band, or the DECON/DPP window wraps — the band shows stale buffer
+memory rather than fresh pixels. Why UT differs from Android is unknown;
+candidates: DSC PPS programming via composer3 in the halium path, GIDLE/
+self-refresh entry, TE2 config.
+
+### 2026-11-11 session results (photos + register audit)
+
+- **Artifact classified** (photos/video in `husky-verify/evidence-20261111-display/`):
+  bottom ~10% shows live squished/striped content + constant red strip at the
+  very bottom edge. Not stale-frame, not Lomiri-related (predates Lomiri).
+- **fb 1008x2256 = benign**: ceil(2244/16)*16 gralloc alignment padding; DPP
+  window scans exactly 2244 (WIN0 end regs, LCD size regs all 2244).
+- **Decon DSC registers verified CORRECT** (reg dump decoded against
+  `display/samsung` headers): PPS matches `fhd_pps_config` byte-for-byte
+  (pic 1008x2244, slice 504x187, 12 slices, all RC params); GRPCNTLINE=168 /
+  REMAINDER=3 consistent with slice_width 504. DSC2 off as expected.
+- **Panel driver audit** (`panel-google-hk3.c` @ gs-6.1_devices lineage-23.2):
+  FHD DSC config self-consistent (12x187); PPS re-sent every `hk3_enable`
+  per-mode; BUT `hk3_init` hardcodes CASET 0-1343 / PASET 0-2991 (WQHD) and
+  `hk3_mode_set` never updates the address window for FHD. Same behavior
+  under Android though, so not sufficient to explain the artifact alone.
+- **No SurfaceFlinger in container** — Mir drives `hwc3-service.pixel`
+  directly. Props (`vendor.display.preferred_mode`, boot_config) confirmed
+  ignored (mode stays 1008x2244@120); `vendor.primarydisplay.op.hs_hz=120`
+  (stock defaults 60Hz NS and switches dynamically — we run locked 120Hz HS).
+- underrun_cnt=2, idma_err=0, ecc=0, recovery=1 — no systemic underrun.
+- **Slot a is dead** (fastboot fell back to b) — no LOS baseline on device.
+  LOS images exist at `work/forensics/los-images/` (payload.bin etc., Nov 4).
+- RNDIS link dropped 3x this session; recovers on its own or via replug.
+
+Next: force-60Hz or WQHD experiment (kernel patch, CI) and/or flash LOS to
+slot a for the native baseline (see BRINGUP.md; slot b UT stays intact).
+
+### Pre-2026-11-11 state
+
 Working theory: the compressed DSI stream (all HK3 modes use DSC) is short by
 roughly the corrupted band, or the DECON/DPP window wraps — the band shows
 stale buffer memory rather than fresh pixels. Why UT differs from Android is
@@ -189,3 +242,50 @@ any image that leaves your bench).
   picks the new kernel.zip automatically.
 - **Validation runs:** SSH helper pattern in `flag-test.py` (bring-up host)
   (paramiko, multi-channel connect, `sudo -S` with empty password).
+
+## 9. Call audio workstream (2026-11-11 evening, defect #2)
+
+**Symptom:** calls connect, no bidirectional audio. PA voicecall profile 0/0.
+
+**Root cause chain (established):**
+1. `module-droid-card-aidl` (PA) tries generic AIDL patches
+   (telephony-rx→speaker, mics→telephony-tx); the Pixel HAL rejects them
+   ("Audio patch ... not implemented" in PA log). Generic patches are the wrong
+   mechanism for telephony on this HAL.
+2. **`media.audio_policy` in the container is a dead stub** — 41 transaction
+codes scanned (1-10, 40-70), ALL return status=0 with empty replies; registered
+   with empty interface `[]`. The real AudioPolicyService is NOT running/driving
+   anything. Therefore nobody creates the telephony patches and the HAL voice
+   engine never starts (`Voice call started: false` even with ACTIVE call +
+   IN_CALL mode). **This is the thing to fix** — if the real APM runs, telephony
+   works as on Android. Next probe: why is it a stub (audioserver boot crash?
+   missing config? check logcat from boot, check halium rootfs init.rc).
+3. HAL itself is fine: full telephony port/route declarations, and it learns
+   call state from the modem by itself (`cs: [CallSession ACTIVE]` during call).
+
+**Proven working tooling (host-side, Python ctypes + libgbinder on /dev/binder):**
+- `IModule.getTelephony` (txn 2) → ITelephony object.
+- `ITelephony.switchAudioMode(mode)` (txn 2) → **works**, HAL AudioMode flips
+  (IN_CALL↔NORMAL verified in dumpsys). Does NOT start the voice path alone.
+- `ITelephony.setTelecomConfig` (txn 3) → fails (-22/-61/0x80000008): parcel
+  layout for TelecomConfig still wrong (voiceVolume @nullable Float, ttyMode
+  enum, isHacEnabled @nullable Boolean). `Voice volume: 0` in HAL — likely
+  needs fixing for audible downlink once the path starts.
+- Scripts: `husky-verify/audio-20261111/` (telephony_switch_mode.py works;
+  aps_*.py probes; NOTES.md has the full ctypes/gbinder recipe + txn codes).
+- Wrapper: `husky-verify/on-phone.sh <file> <basename> <interp> [args]` —
+  copies to phone (waits for RNDIS), runs, retries on drops. `wait-for-phone.sh`
+  for RNDIS-or-Wi-Fi.
+
+**Fix candidates (ranked):**
+1. Revive the real AudioPolicyService (find why it's a stub) — cleanest.
+2. Hand-create telephony patches via raw binder (IModule.setAudioPortConfig=18
+   + setAudioPatch=17), replicating APM sequence; exact AudioPortConfig values
+   for speaker/mic are in `audio-20261111/imodule-dump.txt` method log.
+3. Once path starts: set voice volume (fix setTelecomConfig parcel).
+4. Then wire ofono call state → switchAudioMode (+patches if needed) via a
+   host daemon; `audio-20261111/ofono-call-audio-mode.sh` is a draft skeleton.
+
+**Reference:** hater.cc blog "cmcc-volte-on-self-built-aosp" — same AIDL aoc
+HAL on komodo; voice path = AoC; uplink route `microphones ->
+voice-call-uplink` in media logs when healthy.

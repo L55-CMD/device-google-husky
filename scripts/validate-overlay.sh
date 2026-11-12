@@ -43,7 +43,7 @@ done
 
 while read -r mode _ path; do
     case "${path}" in
-        overlay/system/usr/libexec/lxc-android-config/*|overlay/system/usr/share/ubuntu-touch-session/lsc-wrapper|overlay/system/usr/share/halium-overlay/vendor/bin/vndservicemanager|overlay/system/usr/sbin/usbdp_gbinder|scripts/*.sh|build.sh)
+        overlay/system/usr/libexec/lxc-android-config/*|overlay/system/usr/share/ubuntu-touch-session/lsc-wrapper|overlay/system/usr/share/halium-overlay/vendor/bin/vndservicemanager|overlay/system/usr/share/halium-overlay/system/bin/audioserver|overlay/system/usr/sbin/usbdp_gbinder|scripts/*.sh|build.sh)
             if [ "${mode}" != "100755" ]; then
                 fail "${path} has mode ${mode}, expected 100755"
             fi
