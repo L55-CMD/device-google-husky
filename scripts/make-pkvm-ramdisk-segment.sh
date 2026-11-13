@@ -18,6 +18,22 @@
 # build appends to the halium boot ramdisk (concatenated cpio segments
 # are unpacked in order by the kernel).
 #
+# Ramdisk layout is dictated by the kernel's own config (zuma, verified
+# on device via /proc/config.gz):
+#   CONFIG_MODPROBE_PATH="/system/bin/modprobe"   -> the early usermode
+#     helper execs /system/bin/modprobe, which does NOT exist in the
+#     halium initrd (only /sbin/modprobe -> /bin/kmod). The segment
+#     therefore ships a symlink /system/bin/modprobe -> /bin/kmod.
+#   CONFIG_PKVM_MODULE_PATH="/lib/modules/"       -> modprobe is invoked
+#     as `modprobe -q -d /lib/modules/ -- <name>`; upstream kmod (the
+#     halium initrd's /bin/kmod) uses a -d directory AS-IS, so modules
+#     must be FLAT: /lib/modules/modules.dep + /lib/modules/*.ko.
+#     (No /lib/modules/<uname -r>/ subdir - that layout would only be
+#     needed if CONFIG_PKVM_MODULE_PATH were empty.)
+# The kernel CI's vendor_dlkm.flatten.img ships its modules flat under
+# /lib/modules already; if a future build nests them in a <kver>/ subdir
+# the script detects it and still stages flat.
+#
 # usage: make-pkvm-ramdisk-segment.sh <kernel-extracted-dir> <output.cpio>
 set -euo pipefail
 
@@ -38,12 +54,13 @@ fi
 dfs() { debugfs -R "$1" "${flatten_img}" 2>/dev/null; }
 
 modroot="/lib/modules"
-kver="$(dfs "ls -p ${modroot}" | awk -F: '$2 == "d" {print $6}' | head -n 1)"
-if [ -z "${kver}" ]; then
-    echo "could not resolve kernel version dir under ${modroot}" >&2
-    exit 1
-fi
-moddir="${modroot}/${kver}"
+# The kernel CI's flatten image has been seen in two layouts: modules
+# flat under /lib/modules (current), or in a single <kver>/ subdir
+# (modules_install default). Detect a subdir from the image; otherwise
+# use the flat dir itself. Either way we stage FLAT, because
+# CONFIG_PKVM_MODULE_PATH makes modprobe use /lib/modules/ as-is.
+sub="$(dfs "ls -p ${modroot}" | awk -F/ 'NF == 7 && $6 != "." && $6 != ".." {print $6; exit}')"
+moddir="${modroot}${sub:+/${sub}}"
 
 dep_file="$(mktemp)"
 builtin_file="$(mktemp)"
@@ -56,7 +73,10 @@ dfs "cat ${moddir}/modules.builtin" > "${builtin_file}" || true
 staging="$(mktemp -d)"
 trap 'rm -rf "${staging}"; rm -f "${dep_file}" "${builtin_file}"' EXIT
 
-mkdir -p "${staging}/lib/modules/${kver}"
+# The kernel calls `/system/bin/modprobe -q -d /lib/modules/ -- <name>`;
+# upstream kmod uses the -d directory as-is -> FLAT layout in /lib/modules.
+mkdir -p "${staging}/lib/modules" "${staging}/system/bin"
+ln -s /bin/kmod "${staging}/system/bin/modprobe"
 
 # Resolve the transitive closure of the protected modules, drop built-ins,
 # and stage every remaining .ko. Any dependency that is neither shipped
@@ -125,17 +145,17 @@ if [ "${#ship_list[@]}" -eq 0 ]; then
 fi
 
 for mod in "${ship_list[@]}"; do
-    dfs "dump ${moddir}/${mod} ${staging}/lib/modules/${kver}/${mod}" > /dev/null
-    [ -s "${staging}/lib/modules/${kver}/${mod}" ] || {
+    dfs "dump ${moddir}/${mod} ${staging}/lib/modules/${mod}" > /dev/null
+    [ -s "${staging}/lib/modules/${mod}" ] || {
         echo "failed to extract ${mod} from ${flatten_img}" >&2
         exit 1
     }
 done
 
 # Minimal modules.dep covering only the staged set, with dep paths
-# rewritten to plain filenames (kmod resolves them relative to the
-# module dir of the -d root / default /lib/modules/<kver>).
-python3 - "${dep_file}" "${staging}/lib/modules/${kver}" "${ship_list[@]}" <<'PY'
+# rewritten to plain filenames (kmod resolves them relative to the flat
+# -d directory).
+python3 - "${dep_file}" "${staging}/lib/modules" "${ship_list[@]}" <<'PY'
 import os, sys
 
 dep_path, out_dir = sys.argv[1], sys.argv[2]
@@ -164,8 +184,8 @@ PY
 # root regardless of the archived uid/gid.
 (
     cd "${staging}"
-    find lib -type f | LC_ALL=C sort | cpio -o -H newc --owner=0:0 --quiet > "${out_cpio}.tmp"
+    find lib system \( -type f -o -type l \) | LC_ALL=C sort | cpio -o -H newc --owner=0:0 --quiet > "${out_cpio}.tmp"
 )
 mv "${out_cpio}.tmp" "${out_cpio}"
 
-echo "pkvm ramdisk segment: kver=${kver} modules=${#ship_list[@]} -> ${out_cpio}"
+echo "pkvm ramdisk segment: src=${moddir} modules=${#ship_list[@]} -> ${out_cpio}"
