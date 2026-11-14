@@ -1,6 +1,112 @@
 # Husky port — session handover (2026-11-10/11)
 
-> **2026-11-12 addendum #2 (push day + YouTube-crash fix — READ FIRST):**
+> **2026-11-13 addendum #3 (CI rescue + flash + flicker + SSH recovery — READ FIRST):**
+> Full session recap. All CI fixes are pushed on `test-audio-restore`
+> (`c42b131`, `2028e9d`, `bcbed87`); CI is GREEN; release
+> `latest-test-audio-restore-debug` is built and downloaded.
+> The phone currently runs a **mixed state: baseline super (good
+> screen) + Nov-12 kernel boot images without the pKVM segment**.
+> SSH access works with the **NEW key** (see access changes in §3).
+>
+> **Flicker matrix (defect: fullscreen flicker on test-audio image):**
+> new super = flicker with EITHER boot set; baseline super = good with
+> EITHER boot set ⇒ **the test-audio-restore super causes it**, not the
+> pKVM segment, not the panel. Kernel source/manifest are identical
+> between the builds (kernel-patches `test-audio-restore` is *behind*
+> baseline, manifest *identical* — verified via GitHub compare), so the
+> delta is content or rebuild variance inside the super (audio overlay
+> ships in the 3.5 GB rootfs partition; `android-rootfs.img` also
+> differs by hash). NOT yet narrowed to a file. Host-side super
+> analysis tooling exists (see §8 tools).
+>
+> **Audio live test — mechanism solved:** the restored AudioPolicyService
+> constructor blocks forever in `AudioSystem::getService` when
+> audioserver is started as **root**, because `AudioSystem.cpp`
+> (`android16-release`) only takes the non-blocking local-service path
+> when `getuid() == AID_AUDIOSERVER`. Started via the injected
+> `audioserver.rc` (user audioserver) at boot this cannot happen — but
+> any MANUAL/live-injection start must use the `audioserver` user.
+> Also: the minimedia init service is named **`minimedia`** (binary is
+> `minimediaservice`; `setprop ctl.stop minimediaservice` is a no-op).
+> Prior live run proved the real APM loads the full telephony policy
+> (in-call-playback → AUDIO_DEVICE_OUT_TELEPHONY_TX patches created).
+>
+> **pKVM script fixes (all validated against the real Nov-12 kernel.zip
+> with a local debugfs shim):** (1) +x bit lost in Windows checkout
+> (handover §2 gotcha struck again); (2) `debugfs ls -p` output is
+> `/ino/mode/uid/gid/name/` — the old awk parse never matched; (3) the
+> kernel's own config (verified on-device `/proc/config.gz`):
+> `CONFIG_MODPROBE_PATH="/system/bin/modprobe"` — **the halium initrd
+> only has /sbin/modprobe → the segment must ship the
+> `/system/bin/modprobe → /bin/kmod` symlink** — and
+> `CONFIG_PKVM_MODULE_PATH="/lib/modules/"` ⇒ upstream kmod uses the
+> `-d` dir AS-IS ⇒ **flat** `/lib/modules/modules.dep` + `*.ko` (no
+> `<kver>` subdir). Script handles both flat and `<kver>/` source
+> layouts. Closure: 25 modules, ELF-valid.
+>
+> **Access playbook changes (§3 outdated — read this):**
+> - The OLD bring-up private key was DESTROYED with `bootdebug/`.
+>   NEW keypair: host `husky-verify/husky-rndis-key(.pub)` (ed25519,
+>   comment `husky-bringup-20261113`); pubkey baked into repo
+>   `docs/phone-first-shell/key.sh` (bcbed87). **Hazard:** stale
+>   `~/Downloads/key.sh` copies on the phone contain the DEAD old key —
+>   always fetch fresh (cache-buster query) or install from recovery.
+> - **Recovery-adb key install (no phone typing needed):** boot the
+>   pinned UBports recovery (`husky-flash/ramdisk-recovery.img`,
+>   sha256 in dependencies.lock; `fastboot flash recovery` may fail on
+>   husky — instead `fastboot reboot recovery` boots the already-flashed
+>   halium recovery) → `adb shell` is ROOT → **GOTCHA: the recovery
+>   mounts a tmpfs OVER the real userdata at /cache** — unmount it
+>   (`umount /cache` twice / mount by-name at /mnt/u) or writes vanish.
+>   Real tree: `user-data/phablet/...` (bind source of /home/phablet).
+>   Write `user-data/phablet/.ssh/authorized_keys`, `chown -R
+>   32011:32011`, 700/600, sync, umount, reboot.
+> - userdata = sda34 (ext4, was wiped/reformatted 2026-11-10 17:59 —
+>   R0 drill side effect; halium initrd auto-mke2fs's zeroed headers).
+>   UT rootfs lives as image files at its root (`system_a.img`,
+>   `android-rootfs.img`); bring-up artifacts (lsc-wrapper-husky,
+>   husky-journal.txt, …) persist there.
+> - pstore: by-name `pstore` mounts with `mount -t pstore` in recovery;
+>   last system boot's panic was `iommu_release_device` in
+>   systemd-shutdown (defect #6 family, seen on the test-audio boot).
+>
+> **Host state (post-cleanup rebuild):** `husky-verify/` (new key +
+> key.sh, wait-for-phone.sh, fetch-release.sh, cpio-ls.py, unsparse.py,
+> ext4-ls.py with offset support, debugfs-shim.py + cpio shim under
+> /tmp/shims), `husky-flash/` (test-audio-restore-debug + r8-baseline-debug
+> releases, verified, plus extracted super.raw for BOTH), `work/audio-restore/`
+> (overlay staging tree recovered from git 19f85ff, 41 files).
+> NOTE: a PARALLEL tegu session repurposed dirs and flipped local repo
+> checkouts (kernel-patches-husky / lineage-kernel-manifest-husky are on
+> display branches with mixed remotes) — use GitHub API for branch facts.
+>
+> **Next session, in order:**
+> 1. Phone must reach a call-testable state: current mixed state is
+>    good-screen + SSH-capable. Live-inject the audio overlay (staging
+>    tree at `work/audio-restore/overlay-root/...`; injector must stop
+>    `minimedia` and start audioserver AS USER `audioserver` — check for
+>    `su` in container first), verify `service list` shows
+>    `media.audio_policy: [android.media.IAudioPolicyService]`, then
+>    call test per `call-test.md` (was lost with husky-verify; recreate
+>    from this doc's audio section).
+> 2. Flash ONLY the test-audio-restore boot images (already in
+>    `husky-flash/test-audio-restore-debug/boot-images/`) onto the
+>    baseline super: verifies the pKVM segment (samsung_iommu/s2mpu in
+>    lsmod, no "failed to resume s2mpu" spam, YouTube no-panic, clean
+>    shutdown) while the screen should stay good. If the flicker
+>    returns, the segment IS implicated after all — recheck.
+> 3. Narrow the super flicker: content-level diff the 3.5 GB rootfs
+>    partition of both supers (binary diff is allocation-noise-blind;
+>    regions mapped: whole rootfs + 6872-6940 MB small partitions),
+>    and/or bisect by flashing test-audio super + removing overlay.
+> 4. Only then reflash the full test-audio image and run the §-order
+>    verification: lsmod/sysmmu → YouTube → camera → shutdown → call
+>    audio → display kernel zips (force60/wqhd — note kernel CI for
+>    those branches may be invalidated by the parallel session's work).
+> 5. Docs housekeeping: README status matrix + BRINGUP-LOG defect #2/#6
+>    entries pending the verifications above.
+
+> **2026-11-12 addendum #2 (push day + YouTube-crash fix):**
 > ALL of addendum #1 is now PUSHED and building on CI:
 > - `test-display-force60` + `test-display-wqhd`: kernel experiment
 >   branches (kernel-patches `5fec8a3`/`db8e90b`, manifest
