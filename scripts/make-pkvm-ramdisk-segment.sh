@@ -182,9 +182,15 @@ PY
 
 # Deterministic cpio (newc), root ownership: the kernel unpacks this as
 # root regardless of the archived uid/gid.
+# Directory entries are MANDATORY: the kernel's initramfs unpacker does
+# NOT create parent directories implicitly (verified on device 2026-11-17:
+# the /system/bin/modprobe symlink was silently dropped with ENOENT, the
+# pKVM loader died with "Failed to load pkvm module exynos-pd: -2").
+# LC_ALL=C sort keeps parents before children (lib < lib/modules,
+# system < system/bin < system/bin/modprobe).
 (
     cd "${staging}"
-    find lib system \( -type f -o -type l \) | LC_ALL=C sort | cpio -o -H newc --owner=0:0 --quiet > "${out_cpio}.tmp"
+    find lib system \( -type d -o -type f -o -type l \) | LC_ALL=C sort | cpio -o -H newc --owner=0:0 --quiet > "${out_cpio}.tmp"
 )
 mv "${out_cpio}.tmp" "${out_cpio}"
 

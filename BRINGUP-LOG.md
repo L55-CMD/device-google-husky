@@ -191,6 +191,86 @@ Side note: the `16470000.s2mpu_s0_gsa: failed to resume s2mpu (-13)` spam
 is from the USB-GSA s2mpu instance, NOT pkvm-s2mpu — it appears on
 baseline too; do not use it as the pKVM success/failure signal.
 
+### Defect #6 second on-device verify — 2026-11-17 evening: THREE root causes found (2 fixed, 1 needs kernel work)
+
+Verification loop from handover #3 step 2, all against the Nov-17 CI release
+(`6b7fc69`) flashed as boot-images-only onto the baseline super:
+
+**Root cause #3 (packaging, NOW FIXED in working tree):** the pkvm segment's
+cpio contained ONLY files and symlinks — `find ... \( -type f -o -type l \)`
+**excluded directory entries**. The kernel initramfs unpacker does NOT create
+parent directories implicitly, so the segment's `system/bin/modprobe`
+symlink was silently dropped. Captured on device via an initramfs hook that
+dumped the early dmesg to userdata before the 1MB log buffer wrapped:
+`Failed to load pkvm module exynos-pd: -2` (ENOENT exec of
+/system/bin/modprobe), after `Couldn't mount /proc, pKVM module parameters
+will be ignored` (benign, /proc already mounted). The /lib/modules files
+from the SAME segment unpacked fine because /lib/modules exists in the
+halium initrd. Fix: include dirs in the cpio (`find ... -type d -o -type f -o
+-type l`). Commit pending.
+
+**Capture technique (reusable):** patched the flashed init_boot.img
+in-place: decode ramdisk lz4 stream at 0x1000, rebuild seg0 cpio with a
+hook before `exec run-init` (`dmesg > ${rootmnt}/userdata/pkvm-boot.log` +
+/proc/modules + /lib/modules listing), recompress (`lz4 -l -9`), splice with
+zero-padding (header untouched, region per hdr@0x0C), `dd` to
+/dev/disk/by-partlabel/init_boot_b from root SSH, `cmp` to verify. Script:
+`husky-verify/tmp/repack-initrd.py`. Note: header ramdisk_size field reads 0
+at 0x10; the real region size lives at 0x0C; layout is two concatenated lz4
+legacy frames (halium initrd + pkvm/overlay) — repack as ONE frame, the
+kernel's unlz4 handles it.
+
+**Panic after dir-entry fix (root cause #4, the REAL blocker):** with the
+modprobe symlink present, the full chain now loads at ~0.3s (exynos-pd,
+pkvm-s2mpu-v9 incl. its EL2 module) and samsung_iommu_v9 binds via ueventd
+at ~13.5s — then the phone boot-loops. Panic captured from
+`/var/lib/systemd/pstore/console-ramoops-0` (systemd-pstore archives and
+clears /sys/fs/pstore every boot — that's why pstore always looked empty;
+dmesg-ramoops-* absent means no oops-dump, the panic text IS in the console
+archive because abl shares the region; full trace:
+`husky-verify/tmp/console-ramoops-attempt2-3.log`):
+
+```
+[13.887] sysmmu: SysMMU READ PTW ACCESS FAULT from HSI0 PMMU 0 VID 0
+         Stream ID 0x0 AXI ID 0x0 at 0x0ffffe000 (pgtable @ 0x97e40000)
+[13.887] pkvm-s2mpu-v9 11070000.s2mpu_s0_hsi0: S2MPU FAULT DETECTED
+         PA=0x97e7fff0 FAULT_INFO=0x80400002 read, access permission fault
+[13.888] Kernel panic - not syncing: ... (samsung_sysmmu_irq_thread [samsung_iommu_v9])
+```
+
+Mechanism: the S2MPU **blocks the SysMMU's own page-table walk** — the host
+samsung_iommu's PGD (0x97e40000, domain attached for some master) was never
+registered to the pKVM side, so its PTW reads are access-faults. A master
+with Stream ID 0 / AXI ID 0 on HSI0 (NOT the USB default stream 0x108; NOT
+the RNDIS gadget necessarily — usb@11210000 has no iommus prop at all and
+sysmmu@11040000 has **no `s2mpus` property**, unlike the other SysMMUs)
+triggers it 13.9s into userspace. On stock the pkvm<->host-iommu
+registration covers these tables; ours doesn't. Also noted: the CI
+vendor_dlkm modules.dep is NOT a real symbol-dependency file — ELF parsing
+(`husky-verify/tmp/elfdeps.py`) shows the true closure of
+{exynos-pd, pkvm-s2mpu-v9} is only FIVE modules (exynos-pd, pkvm-s2mpu-v9,
+phy-exynos-usbdrd-eusb-super, exynos-pd_hsi0, eusb_repeater); the 24-module
+closure from the CI dep file drags in dss/vh_sched/cmupmucal and must not be
+used as-is.
+
+**Next steps (kernel/DT work, next session):**
+1. Decide the fix direction: (a) investigate why the pkvm_s2mpu_of_link /
+   pkvm_iommu_s2mpu_register handshake doesn't cover the host PGD (compare
+   samsung_iommu_v9 registration path, check the missing `s2mpus` DT prop
+   on sysmmu@11040000, compare lineage vs stock DTB), or (b) late-load
+   approach: patch pkvm_s2mpu.c to skip the EL2 load when
+   `is_pkvm_initialized()` (module then loads at container start, exports
+   the pkvm_s2mpu_of_link_v9 symbols samsung_iommu needs, no S2MPU
+   enforcement, MFC still gets a real domain) — needs a kernel build.
+2. Ship only the TRUE 5-module closure + ELF-derived modules.dep (update
+   `scripts/make-pkvm-ramdisk-segment.sh` to compute deps from ELF symbol
+   tables, not the CI modules.dep).
+3. Commit the dir-entry fix (working tree) once the above lands.
+
+**Phone state:** restored to r8-baseline-debug boot images on baseline
+super (boots, SSH OK). The test-audio-restore CI release is still valid;
+local patched init_boot images (attempt1/2/min) are in `husky-verify/tmp/`.
+
 ## Next display tests
 
 Run each configuration from a clean boot or a LightDM restart, and record a photo, compositor log, composer3 logcat, and DRM state:
