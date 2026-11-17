@@ -161,6 +161,36 @@ the original diff wrapped both FHD entries but left WQHD120 exposed (not the
 intended WQHD60-only isolation). Kernel CI builds pending; test after the
 call-audio work per the ordered queue.
 
+### Defect #6 fix VERIFICATION FAILED on first try — second root cause found and fixed (2026-11-17)
+
+Flashing the Nov-13 `test-audio-restore-debug` boot images (handover #3
+step 2) did NOT fix the IOMMU chain: `pkvm_s2mpu-v9` and
+`samsung_iommu_v9` both absent from lsmod, no `samsung-sysmmu` driver
+bound (25 sysmmu devices idle), `exynos_mfc` loaded domain-less again.
+The pKVM segment never reached the device.
+
+**Root cause (second, in the packaging):** `prepare-device-tarball.sh`
+appended the raw pkvm cpio AFTER the gzip-compressed halium initrd.
+`make-bootimage.sh` recompresses the ramdisk for
+`deviceinfo_ramdisk_compression="lz4"` via `gzip -dc | lz4` — gzip decodes
+only the first stream, drops the raw segment as "trailing garbage
+ignored" (exit 2, masked by the pipe). Verified by unpacking the flashed
+`init_boot.img`: segments = halium initrd (357 files) + ramdisk-overlay
+(`scripts/halium`) only. The 2026-11-13 "validated against kernel.zip"
+claim covered the segment CONTENTS, not its survival through the image
+pipeline.
+
+**Fix:** `6b7fc69` — concatenate the RAW cpio streams (halium initrd
+decoded + pkvm segment) before re-gzipping, so the build-tools
+recompression round-trips everything. Round-trip validated locally with
+the pinned initrd. Success criteria for the NEXT on-device attempt:
+`lsmod | grep pkvm_s2mpu`, `ls /sys/bus/platform/drivers | grep
+samsung-sysmmu`, `dmesg | grep samsung_iommu`.
+
+Side note: the `16470000.s2mpu_s0_gsa: failed to resume s2mpu (-13)` spam
+is from the USB-GSA s2mpu instance, NOT pkvm-s2mpu — it appears on
+baseline too; do not use it as the pKVM success/failure signal.
+
 ## Next display tests
 
 Run each configuration from a clean boot or a LightDM restart, and record a photo, compositor log, composer3 logcat, and DRM state:
