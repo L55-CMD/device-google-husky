@@ -131,6 +131,36 @@ bring-up host `work/audio-restore/overlay-root/`, evidence
 `husky-verify/audio-20261112/NOTES.md`. Not yet committed to the device
 repo.
 
+## 2026-11-17 update
+
+### Defect #6 fix: LANDED (pKVM ramdisk segment) — on-device verify still pending
+
+The queued one-liner modprobe fix evolved into the root-cause fix, committed
+on `test-audio-restore` (`c42b131`..`2028e9d`, CI green): a cpio segment
+appended to the halium boot ramdisk (`scripts/make-pkvm-ramdisk-segment.sh`)
+that ships `exynos-pd` + `pkvm-s2mpu-v9` and their full dependency closure
+(25 modules, flat `/lib/modules` layout, `/system/bin/modprobe -> /bin/kmod`
+symlink — both paths dictated by the kernel's own config:
+`CONFIG_MODPROBE_PATH`, `CONFIG_PKVM_MODULE_PATH`). This lets the kernel's
+early pKVM usermode modprobe succeed before pKVM finalizes, so
+`samsung_iommu_v9` can load afterwards, `*.sysmmu` bind, and MFC gets a real
+IOMMU domain.
+
+Still open: on-device verification (handover #3 step 2 — flash ONLY the
+test-audio-restore boot images onto the baseline super; expect `samsung_iommu`
+in lsmod, no s2mpu resume spam, YouTube playback without panic, clean
+shutdown). Also note the 2026-11-12 modprobe-at-container-start alternative
+was NOT taken — the ramdisk segment addresses the root cause instead.
+
+### Display diagnostics status
+
+`kernel-patches-husky` branches `test-display-force60` and
+`test-display-wqhd` are pushed; `lineage-kernel-manifest-husky` is staged on
+`test-display-wqhd`. The wqhd patch was corrected on 2026-11-17 (`7201582`):
+the original diff wrapped both FHD entries but left WQHD120 exposed (not the
+intended WQHD60-only isolation). Kernel CI builds pending; test after the
+call-audio work per the ordered queue.
+
 ## Next display tests
 
 Run each configuration from a clean boot or a LightDM restart, and record a photo, compositor log, composer3 logcat, and DRM state:
