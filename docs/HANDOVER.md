@@ -1,5 +1,78 @@
 # Husky port — session handover (2026-11-10/11)
 
+> **2026-11-14 addendum #4 (audio live-injection — mechanism built, NEW
+> defect #7 found — READ FIRST):**
+> Session goal was handover-#3 step 1 (live-inject audio overlay, call test).
+> **Not finished — phone began REBOOTING itself mid-session** (see §10).
+>
+> **Done this session:**
+> - `husky-verify/audio-20261112/inject-audio-restore.sh` repaired: key path
+>   (bootdebug→husky-verify), `ctl.stop minimedia` (not minimediaservice),
+>   delegates start to `restart-audio.sh` → `start-audioserver.py`.
+> - **audioserver start-as-1041 — fully solved, with the complete root-cause
+>   chain** (each step was a real dead end):
+>   1. `lxc-attach` has NO `-u/-g` (LXC 5.0.3 verified on device).
+>   2. nsenter+setpriv fails: setpriv's binary lives on the host fs which
+>      VANISHES after `setns(mnt)` (noexec ENOENT).
+>   3. python setns helper: entering mnt-ns first hides host `/proc` pids.
+>      Fix: open ALL ns fds + `chroot(/proc/<init>/root)` BEFORE `setns(mnt)`.
+>   4. **Kernel rule that bit hardest: `setns(pid_fd)` never moves the CALLER
+>      into the pid ns — only its future CHILDREN.** Without a second fork
+>      the exec'd binary sees the container's `/proc` while sitting in the
+>      host pid ns → bionic linker stats `/proc/self/exe` at startup →
+>      ENOENT → `async_safe_fatal("unable to stat either ...")` +
+>      SIGABRT before main. The final helper forks TWICE (fork; child
+>      setns(pid); fork; grandchild setgroups([])/setgid/setuid(1041)/exec).
+>      Verified working: `main: starting` + `AudioFlinger created` log, AF
+>      registered (`media.audio_flinger: [android.media.IAudioFlinger]` —
+>      ours), APM threads alive (ApmAudio/ApmOutput/FastMixer/AudioOut_45).
+> - Overlay injection itself works flawlessly (binary sha256 matches git
+>   blob; libs/configs in container overlay upper).
+>
+> **NEW DEFECT #7 — A16 audioserver waits forever for framework
+> `activity`:** after APM construction, `main_audioserver.cpp` (A16,
+> `media/audioserver/main_audioserver.cpp`) hangs in
+> `waitForService("activity")` (libbinder log every 1s: *"Waited one second
+> for activity (is service started? ...)"*). The ActivityManager lives in
+> system_server which does not exist in the halium container ⇒ APS never
+> registers `media.audio_policy`. **This means the flashed test-audio image
+> has the same hang** — the overlay as shipped will NOT fix defect #2 on its
+> own; the wait must be satisfied (stub service) or the code path avoided.
+> The waiter is in the audioserver binary/dep chain (string "activity" sits
+> in its rodata next to AudioFlinger strings "Active Assistants UIDs" etc.);
+> exact call site not yet pinned (checked: not in frameworks/av A16 sources,
+> not libaudiopermission/libaudiopolicycomponents rodata).
+>
+> **Stub attempts (next session continues here):**
+> - gbinder `add_service` (async, GLib loop): reports status=0 but service
+>   never appears — gbinder only implements LEGACY add layout; A16
+>   servicemanager needs the AIDL parcel (interface token +
+>   allowIsolated/dumpsysPriority). Dead end.
+> - Raw `/dev/binder` ioctl addService: script
+>   `husky-verify/audio-20261112/raw_add_activity.py`. **This 6.1 kernel's
+>   BC commands embed the struct size: `BC_TRANSACTION = _IOW('c',0,56) =
+>   0x40386300`** (bare `_IOC_NONE` 0x6300 → dmesg "unknown command 25344").
+>   BR codes likewise: BR_ERROR=0x80047200, BR_TRANSACTION=0x80387202,
+>   BR_REPLY=0x80387203, BR_DEAD_REPLY=0x7205, BR_TRANSACTION_COMPLETE=
+>   0x7206, BR_NOOP=0x720C. BINDER_WRITE_READ=0xC0306201 verified.
+>   Script still returns EINVAL on the full transaction — next step:
+>   compare against the PHONE's own `/usr/include/linux/android/binder.h`
+>   and read dmesg ("binder: <pid> ...") in the SAME ssh session as the
+>   trigger to see the exact reject reason (unknown cmd vs txn validation).
+>   Note fake local ptr 0xDEC0ADD0/cookie 0xFEEDFACE in the flat object;
+>   sender is host uid 0 (allowed by servicemanager; SELinux permissive).
+> - Once ANY stub "activity" is registered, audioserver should proceed:
+>   expect `media.audio_policy: [android.media.IAudioPolicyService]`, then
+>   run `call-test.md`.
+>
+> **Phone state:** mixed state (baseline super + Nov-12 boots, no pKVM
+> segment) STILL CURRENT; overlay injected in the CONTAINER UPPER survives
+> until container restart; injected audioserver currently hung on the
+> "activity" wait (pid was 146138 pre-reboot — restart via
+> `sudo bash /tmp/restart-audio.sh restart` after any container restart;
+> helpers live in phone /tmp which is WIPED ON REBOOT — re-scp from
+> `husky-verify/audio-20261112/`).
+
 > **2026-11-13 addendum #3 (CI rescue + flash + flicker + SSH recovery — READ FIRST):**
 > Full session recap. All CI fixes are pushed on `test-audio-restore`
 > (`c42b131`, `2028e9d`, `bcbed87`); CI is GREEN; release
@@ -418,3 +491,29 @@ codes scanned (1-10, 40-70), ALL return status=0 with empty replies; registered
 **Reference:** hater.cc blog "cmcc-volte-on-self-built-aosp" — same AIDL aoc
 HAL on komodo; voice path = AoC; uplink route `microphones ->
 voice-call-uplink` in media logs when healthy.
+
+## 10. Device stability — periodic spontaneous reboots (2026-11-14)
+
+The repeated "RNDIS outages" during the 2026-11-14 session were finally
+explained: **the phone reboots itself** (dmesg showed `[35.017041]`-style
+fresh-uptime timestamps when the link returned; phone-side `/tmp` was wiped,
+which only a reboot does). Pattern: 30–60 min of uptime, then dead air,
+then the phone is back in a fresh boot.
+
+Suspects to check next session (in order):
+1. Our meddling: we stopped the `minimedia` init service and injected a
+   hung `audioserver` (futex-blocked in waitForService) — dmesg at boot
+   showed `binder: <pid> cannot find target node ... code 256921159
+   size 32-0` repeating (some daemon retrying a dead node — possibly the
+   cpif/modem or the component that used minimedia's APM stub).
+2. Defect #6 family (pKVM/s2mpu; last known shutdown panic was
+   `iommu_release_device` NULL domain) — the Nov-12 boots lack the pKVM
+   segment fix, and spontaneous reboots could be shutdown-path panics
+   triggered by suspend.
+3. Check pstore (`mount -t pstore` in recovery) after the next spontaneous
+   reboot and diff the panic signature against the known ones.
+
+Workaround for bring-up sessions: keep every phone-side artifact in
+`/userdata` (survives reboot) not `/tmp`, re-push helpers after each
+reboot, and restart audioserver via `restart-audio.sh` after any container
+restart.
