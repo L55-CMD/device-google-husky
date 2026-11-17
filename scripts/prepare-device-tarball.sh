@@ -121,10 +121,19 @@ download_verified "${RECOVERY_IMAGE_URL:?RECOVERY_IMAGE_URL is required}" \
 # (see BRINGUP-LOG, defect: YouTube/MFC NULL-IOMMU-domain panic). Append
 # the module segment to the halium ramdisk; concatenated cpio segments
 # are unpacked in order.
+#
+# The halium initrd is a GZIP cpio, and make-bootimage.sh recompresses the
+# ramdisk for deviceinfo_ramdisk_compression="lz4" via `gzip -dc | lz4`.
+# Appending raw cpio bytes after the .gz makes that step SILENTLY DROP the
+# segment (gzip exits 2, "trailing garbage ignored", masked by the pipe)
+# - verified on device 2026-11-17: init_boot.img lacked every pkvm module.
+# Concatenate the RAW cpio streams FIRST, then re-gzip, so the build-tools
+# recompression round-trips the whole ramdisk.
 "${repo_root}/scripts/make-pkvm-ramdisk-segment.sh" \
     "${kernel_dir}" "${tmpdown}/pkvm-modules.cpio"
-cat "${tmpdown}/halium-boot-ramdisk.img" "${tmpdown}/pkvm-modules.cpio" \
-    > "${tmpdown}/halium-boot-ramdisk-pkvm.img"
+gzip -dc "${tmpdown}/halium-boot-ramdisk.img" > "${tmpdown}/halium-boot-ramdisk.rawcpio"
+cat "${tmpdown}/halium-boot-ramdisk.rawcpio" "${tmpdown}/pkvm-modules.cpio" \
+    | gzip -9 > "${tmpdown}/halium-boot-ramdisk-pkvm.img"
 
 if [[ -n "${deviceinfo_unified_recovery_ui_density:-}" && "${deviceinfo_unified_recovery_ui_density}" != "mdpi" ]]; then
     git_clone_if_missing "https://github.com/JamiKettunen/halium_bootable_recovery" "resource-updates" "${tmpdown}/halium_bootable_recovery"
