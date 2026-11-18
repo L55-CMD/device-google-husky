@@ -49,3 +49,4 @@ deviceinfo_unified_recovery_ui_density="xxhdpi"
 # Branch test-audio-restore-ltonone: device CI pairs with the LTO_NONE kernel
 # release (CONFIG_LTO_NONE=y) to isolate the pKVM EL2 S2MPU notifier
 # failure (defect #6). See BRINGUP-LOG.md 2026-11-18.
+# CI retry 1 (run 94 docker build failed ~5min in, cause unknown - logs need auth)
