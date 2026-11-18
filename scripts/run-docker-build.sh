@@ -14,6 +14,9 @@ if [ -n "${JOB_CONTAINER_NAME:-}" ]; then
   docker_volumes=(--volumes-from "${JOB_CONTAINER_NAME}")
 fi
 
+log_file="${workspace_dir}/workdir/build-final.log"
+mkdir -p "$(dirname "${log_file}")"
+
 docker run --rm --privileged \
     -e WORKSPACE_DIR="$(pwd)" \
     -e PACKAGE_REGISTRY_BASE="${PACKAGE_REGISTRY_BASE:-}" \
@@ -24,4 +27,4 @@ docker run --rm --privileged \
     "${docker_volumes[@]}" \
     -w "$(pwd)" \
     "${image_tag}" \
-    ./scripts/run-in-container.sh
+    ./scripts/run-in-container.sh 2>&1 | tee "${log_file}"
