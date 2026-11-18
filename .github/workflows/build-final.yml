@@ -150,6 +150,22 @@ jobs:
           path: workdir/build-final.log
           if-no-files-found: ignore
 
+      - name: Publish failure log to rolling release
+        # artifacts are auth-walled for downloads; releases are not. Keeps
+        # CI failures debuggable without a GitHub login.
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch_tag="$(printf '%s' "${{ github.ref_name }}" | sed 's#[^A-Za-z0-9_.-]#-#g')"
+          tag="latest-${branch_tag}-buildlog"
+          gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "${tag}" workdir/build-final.log \
+            --title "Build failure log (${branch_tag}, ${{ matrix.variant }})" \
+            --notes "Automatic build log from failed run ${{ github.run_number }}." \
+            --latest=false
+
       - name: Build ${{ matrix.variant }} super.img
         run: |
           set -euo pipefail
