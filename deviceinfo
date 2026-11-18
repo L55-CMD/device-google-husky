@@ -45,3 +45,7 @@ deviceinfo_halium_version="16"
 deviceinfo_ubuntu_touch_release="24.04-1.x"
 deviceinfo_use_unified_recovery="true"
 deviceinfo_unified_recovery_ui_density="xxhdpi"
+
+# Branch test-audio-restore-ltonone: device CI pairs with the LTO_NONE kernel
+# release (CONFIG_LTO_NONE=y) to isolate the pKVM EL2 S2MPU notifier
+# failure (defect #6). See BRINGUP-LOG.md 2026-11-18.
