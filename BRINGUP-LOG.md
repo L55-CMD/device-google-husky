@@ -267,6 +267,44 @@ used as-is.
    tables, not the CI modules.dep).
 3. Commit the dir-entry fix (working tree) once the above lands.
 
+**Option B investigation (2026-11-17 late, user chose full pKVM fix):**
+mechanism fully mapped from sources (lineage google-modules, lineage-23.2):
+- S2MPU MPT = mirror of the pKVM HOST STAGE-2 map (`hyp/s2mpu.c`:
+  `initialize_with_mpt(dev, &host_mpt)`, kept current by the
+  host-stage-2 map/unmap notifiers `s2mpu_host_stage2_idmap_*`). Anything
+  allocated+mapped after S2MPU init (like samsung_iommu's FLPT, kmem_cache
+  at ~13.5s) reaches the MPT ONLY via those notifiers.
+- Our boot: notifiers never fired for the FLPT -> S2MPU denies the PTW
+  read -> panic. Same module, same 0.3s load timing as stock, so the
+  suspect is OUR KERNEL BUILD: `CONFIG_LTO_CLANG_THIN=y` (+CFI) breaking
+  the EL2 module's notifier/relocation registration
+  (`kvm_apply_hyp_module_relocations`). /proc/config.gz is the GKI core
+  config only - it cannot show vendor-module CONFIG_PKVM_S2MPU_V9 (=m in
+  the vendor build; Kconfig default n, enabled in the shusky vendor
+  defconfig).
+- `sysmmu_hsi0` lacking the `s2mpus` DT prop is UPSTREAM zuma design (also
+  absent on sysmmu_misc/sysmmu_gsa); `dwc3@11210000` HAS
+  `iommus = <&sysmmu_hsi0>` + phy `s2mpus = <&s2mpu_s0_hsi0>`, so dwc3 is
+  the master that gets the HSI0 domain.
+- CORRECTION (2026-11-18): the "CI modules.dep is bogus / true ELF
+  closure is 5 modules" claim above was WRONG. A hand-rolled ELF closure
+  over-counts (kernel shim exports like strlcpy, exported by bcmdhd,
+  falsely pull wifi/pcie chains - depmod knows the kernel symbol table)
+  and under-counts (attempt-3's pkvm-boot.log shows `modprobe -d
+  /lib/modules/` FAILED on the 5-module set; only the kernel's
+  fallback-to-default-path retry loaded the modules). depmod's
+  modules.dep (25-module closure incl. dss/vh_sched) is authoritative
+  after all; the segment script keeps using it. The ltonone test images
+  therefore ship the depmod closure.
+- TEST IN FLIGHT: kernel-patches-husky branch `test-audio-restore-ltonone`
+  (+ manifest branch same name) = test-audio-restore with
+  CONFIG_LTO_NONE=y / LTO_CLANG_THIN=n in halium.config. Kernel CI builds
+  kernel.zip tagged `test-audio-restore-ltonone`; verify by splicing the
+  new Image + pkvm-s2mpu-v9.ko into the local init_boot/boot images
+  (tooling in husky-verify/tmp/) and dd-flashing. If the 13.9s HSI0 panic
+  is gone -> LTO confirmed as the breaker; if not, next suspects are the
+  host-stage-2 notifier wiring in the el2 module init path.
+
 **Phone state:** restored to r8-baseline-debug boot images on baseline
 super (boots, SSH OK). The test-audio-restore CI release is still valid;
 local patched init_boot images (attempt1/2/min) are in `husky-verify/tmp/`.
