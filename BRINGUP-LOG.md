@@ -300,16 +300,37 @@ mechanism fully mapped from sources (lineage google-modules, lineage-23.2):
   therefore ship the depmod closure.
 - STATUS (2026-11-18 late): local splice test was INVALID (module
   mismatch); device-CI redo (run 98, matched images) died EARLIER at 8.4s
-  ("Couldn't find data partition") because the CI-built boot ramdisk had
-  only 25 modules instead of 209 (modules.load empty). The LTO_NONE
-  verdict at the 13.9s mark is therefore STILL OPEN. Current blocker is
-  the 25-vs-209 module-selection bug in the device build, not the kernel.
+  ("Couldn't find data partition") because the CI-built INIT_BOOT
+  ramdisk had only 25 modules instead of 209 (modules.load empty). The LTO_NONE
+  verdict at the 13.9s mark is therefore STILL OPEN.
+  **RETRACTED 2026-11-19: the "25-vs-209 module-selection bug in the device
+  build" theory — see NEXT-SESSION-NOTES.md (2026-11-19). The CI images are
+  all correct; the bootloop was an INCOMPLETE FLASH (vendor_kernel_boot_b
+  never re-flashed), and the real blocker is the 13.9s pKVM/S2MPU panic.**
   See husky-verify/NEXT-SESSION-NOTES.md (2026-11-18 22:10 + 22:50
   sections) for the next actions.
 
 **Phone state:** restored to r8-baseline-debug boot images on baseline
 super (boots, SSH OK). The test-audio-restore CI release is still valid;
 local patched init_boot images (attempt1/2/min) are in `husky-verify/tmp/`.
+
+## 2026-11-19 — LTO_NONE on-device test: PASS; CLANG_THIN confirmed as the EL2 notifier breaker
+
+Full matched run-98 set (boot/init_boot/vendor_kernel_boot/vendor_boot/dtbo
+to slot b, one reboot; see NEXT-SESSION-NOTES 2026-11-19 for preflight +
+hashes). Booted cleanly past the 13.9s HSI0 SysMMU PTW panic mark: lsmod
+has pkvm_s2mpu_v9 + samsung_iommu_v9 + samsung_iommu_group, 26 sysmmus
+bound incl. HSI0 (11040000), mfc-core bound to MFC-0, dwc3/RNDIS alive;
+zero S2MPU/access-fault/panic lines in live dmesg. Evidence:
+husky-verify/tmp/ltonone-full-20261119-105157/. With CONFIG_LTO_NONE the
+EL2 host-stage-2 notifiers fire (post-init samsung_iommu FLPT reaches the
+S2MPU MPT); under CONFIG_LTO_CLANG_THIN(+CFI) they never registered.
+Defect #6 acceptance: YouTube playback WORKING (user-verified on device,
+2026-11-19, same boot); clean shutdown still untested. Defect #1
+bottom-region scanout artifact also RESOLVED on this build (user-verified) —
+mechanism unknown, DSC/quirk-matrix queue moot. Merge follow-up: keep
+LTO_NONE in halium.config on the mainline patch branch; cherry-pick b808d33
+recovery pin onto test-audio-restore.
 
 ## Next display tests
 

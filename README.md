@@ -6,7 +6,7 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 
 | Area | Status |
 |---|---|
-| Boot to Lomiri | Working, with a bottom-region scanout artifact |
+| Boot to Lomiri | Working. Bottom-region scanout artifact RESOLVED on the LTO_NONE build (user-verified 2026-11-19; mechanism unknown — was previously blamed on DSC/scanout) |
 | Boot/reboot stability | Working (many deliberate reboots and session restarts during bring-up) |
 | Touch | Working, including edge gestures and app drawer |
 | Terminal app / Morph browser | Working (used for on-device setup and downloads) |
@@ -23,7 +23,7 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 | UI clock widget | Does not update despite correct system clock |
 | Audio playback/microphone | Pulse devices exist; call routing incomplete. Defect #7: A16 audioserver blocks on `waitForService("activity")`; stub-service work in progress |
 | Sensors / vibration | Not validated |
-| Camera/video acceleration | Fix landed 2026-11-17 (pKVM ramdisk segment); on-device verification IN PROGRESS — blocked by a 25-vs-209 boot-ramdisk module bug in the device CI build, see BRINGUP-LOG.md |
+| Camera/video acceleration | pKVM/S2MPU fix verified on device (2026-11-19): YouTube playback WORKING; clean-shutdown test still open |
 | Suspend/resume / shutdown | Not validated (reboots are stable; suspend untested) |
 | USB-C DisplayPort | Not validated |
 | Recovery/offline charging | Not validated |

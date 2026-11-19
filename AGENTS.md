@@ -71,39 +71,51 @@ Keep Current state below 80 lines. Append historical detail to
 BRINGUP-LOG.md instead.
 
 ## Current state
-2026-11-19T10:05Z
+2026-11-19T11:00Z
 
-- Commits: device-google-husky @ test-audio-restore-ltonone (b808d33
-  plus UNCOMMITTED doc/script cleanup); kernel-patches-husky 24ffa8d
-  (halium.config CONFIG_LTO_NONE=y); lineage-kernel-manifest-husky
-  2f6f5fd.
-- Images tested: latest-test-audio-restore-ltonone-debug, CI run 98
-  (boot.img sha 6764e3c5, init_boot.img sha 3476aad7), flashed to
-  slot b 2026-11-18 ~21:56Z.
-- Result: BOOTLOOP, died at 8.4s — halium initrd "PANIC: Couldn't find
-  data partition". The CI-built boot ramdisk held 25 .ko (pkvm-segment
-  closure size) instead of 209, with an EMPTY modules.load; only the
-  pkvm closure loaded, so UFS/storage never probed.
-- Evidence: husky-verify/tmp/console-ramoops-ltonone-ci.log; images in
-  husky-flash/ltonone-ci/.
-- Exonerated: (1) the LTO_NONE kernel.zip itself — its initramfs.img
-  carries the full 209-module set with byte-identical modules.load to
-  the working test-audio kernel.zip; (2) "LTO zip breaks the device
-  build" — the run 94-97 CI failures were the rolling recovery-image
-  URL hash drift, fixed by pinning build 603 (b808d33).
-- NO VERDICT: CONFIG_LTO_CLANG_THIN as the EL2 S2MPU notifier breaker.
-  Both LTO_NONE attempts died at 8.4s, BEFORE the 13.9s HSI0 SysMMU
-  panic mark — hypothesis open, neither confirmed nor cleared.
-- Phone: r8-baseline-debug on slot b, UP, SSH OK (root key, RNDIS
-  10.15.19.82). Failed boot's pstore archived locally (systemd-pstore
-  clears /sys/fs/pstore each boot — read /var/lib/systemd/pstore).
-- Next discriminating action: unpack run 98's boot/init_boot ramdisk
-  properly (husky-verify/tools/mkbootimg.py + tmp/repack*.py), confirm
-  25-vs-209 and where modules.load went; diff run-98 build log vs
-  working run 93 module assembly; fix the device build's module pickup;
-  re-run CI, flash boot_b+init_boot_b, and finally get the LTO_NONE
-  verdict at the 13.9s mark.
-- Also open: cherry-pick b808d33 onto test-audio-restore (its CI is
-  broken by the same rolling-URL drift). Queues: defect #7 audio stub
-  (phone scripts ready in husky-verify/audio-20261112/); display
-  force60/wqhd kernel tests.
+- Commits: device-google-husky @ test-audio-restore-ltonone 44f2ea6 (+ small
+  UNCOMMITTED wording fixes in AGENTS.md/BRINGUP-LOG.md); kernel-patches-husky
+  24ffa8d (CONFIG_LTO_NONE=y); lineage-kernel-manifest-husky 2f6f5fd.
+- RUN-98 LTO_NONE TEST: PASS AT THE 13.9s MARK (TESTED on device).
+  Full matched 5-image set (boot/init_boot/vendor_kernel_boot/vendor_boot/
+  dtbo -> *_b) flashed 2026-11-19 10:51Z via the new
+  husky-verify/flash-ltonone-full.sh; one reboot; observed to uptime 120s+.
+  lsmod: pkvm_s2mpu_v9 + samsung_iommu_v9 + samsung_iommu_group all loaded;
+  samsung-sysmmu-v9 bound to 26 sysmmus INCL. 11040000 (HSI0); mfc-core
+  bound to 1a4d0000.MFC-0; dwc3 gadget + RNDIS/SSH alive (the HSI0 master
+  that used to fault). Live dmesg: ZERO s2mpu/access-fault/PTW/panic lines;
+  the 13.5-14.5s window shows normal ext4/overlay mounts.
+- VERDICT: CONFIG_LTO_CLANG_THIN(+CFI) CONFIRMED as the breaker of the EL2
+  S2MPU host-stage-2 notifier path (hypothesis open since 2026-11-17).
+  LTO_NONE is currently the only known-booting config for this chain.
+- Root cause of the 2026-11-18 bootloop (separate issue, SOLVED): incomplete
+  flash — vendor_kernel_boot_b had not been re-flashed; halium initrd buried
+  modules.load on kver mismatch. Device build was never at fault.
+- Artifact hashes (== CI rolling release, boot-images.zip 7276a00c...e3d,
+  MANIFEST device b808d33 = run 98): boot.img 6764e3c5...01eef,
+  init_boot.img 3476aad7...440dd, vendor_kernel_boot.img da3e1db5...e78f,
+  vendor_boot.img a3a44eba...872c, dtbo.img 3dba3e31...4798c.
+  Kernel string + module dir + .ko vermagic all = 6.1.145-android14-11-
+  gc9a0580a0791 (verified pre-flight).
+- Evidence: husky-verify/tmp/ltonone-full-20261119-105157/
+  {post-boot.txt, dmesg-live.txt, console-ramoops-0.log}. NOTE: the
+  console-ramoops archive is the PRIOR r8-baseline boot's console (systemd-
+  pstore archives at boot start); this boot's console is in dmesg-live.txt.
+  Unpacker: husky-verify/tmp/unpack-init_boot.py (lz4-legacy u32 framing).
+- r8 rollback set: verified present + hash-good (boot-images.zip_ 84ac198d,
+  all 5 images match in-zip) at husky-flash/r8-baseline-debug/boot-images/.
+- Phone: run-98 LTO_NONE debug on slot b, UP, SSH OK (10.15.19.82), battery
+  99% charging. Rollback available if needed. User session on device:
+  YouTube playback WORKING, bottom-screen artifact ABSENT.
+- Remaining defect #6 acceptance: clean-shutdown test (second reboot —
+  user decision). YouTube playback: WORKING (user-verified on this boot
+  2026-11-19). BONUS: defect #1 bottom-region scanout artifact GONE on this
+  build (user-verified) — the quirk/DSC-bisect queue is moot; mechanism
+  UNKNOWN (suspects: LTO miscompile in the display path, or fall-out from
+  the previously domain-less IOMMU/display modules). Re-test the quirk
+  flag only if tearing reappears.
+- Next actions: (1) merge decision — keep LTO_NONE in halium.config on the
+  mainline patch branch (revisit CLANG_THIN only with a targeted fix);
+  (2) cherry-pick b808d33 onto test-audio-restore; (3) defect #7 audio stub
+  tests can run on THIS boot (helpers: husky-verify/audio-20261112/);
+  (4) display force60/wqhd queue unchanged.
