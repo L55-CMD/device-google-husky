@@ -20,5 +20,14 @@ Tag `known-good-r8-20261110` identifies the three coordinated revisions listed i
 
 1. Build and flash normal/debug variants from the cleaned device branch.
 2. Retest camera/SMS permissions now that AppArmor and Mir trust-store startup are fixed.
-3. Investigate the bottom-region framebuffer wrap using the four Lomiri flag combinations.
+3. Display: Lomiri quirk matrix already run (all four combinations —
+   artifact present in every one); next is the force60/wqhd kernel-branch
+   tests, then DSC/mode bisect. Do not re-run the quirk matrix.
 4. Continue hardware validation in dependency order: UI/touch/backlight, power cycles, Wi-Fi/Bluetooth, audio, sensors, cellular, camera.
+
+## Post-stability research (not critical path)
+
+- GPU (Mali G715) as the on-device ML inference tier via Mesa Vulkan/OpenCL.
+- Bounded experiment: stock libedgetpu + firmware vs. our kernel edgetpu
+  driver in-container, to get a definitive TPU accept/reject verdict.
+  Details in husky-verify/NEXT-SESSION-NOTES.md "Post-stability research queue".

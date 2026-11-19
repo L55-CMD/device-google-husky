@@ -21,9 +21,9 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 | SMS | Permission flow needs retest on cleaned image (trust-store fix is now in-image) |
 | Camera app | Permission/trust-store startup fixed in image; capture untested |
 | UI clock widget | Does not update despite correct system clock |
-| Audio playback/microphone | Pulse devices exist; call routing incomplete |
+| Audio playback/microphone | Pulse devices exist; call routing incomplete. Defect #7: A16 audioserver blocks on `waitForService("activity")`; stub-service work in progress |
 | Sensors / vibration | Not validated |
-| Camera/video acceleration | Blocked by exynos MFC IOMMU fault; node masked |
+| Camera/video acceleration | Fix landed 2026-11-17 (pKVM ramdisk segment); on-device verification IN PROGRESS — blocked by a 25-vs-209 boot-ramdisk module bug in the device CI build, see BRINGUP-LOG.md |
 | Suspend/resume / shutdown | Not validated (reboots are stable; suspend untested) |
 | USB-C DisplayPort | Not validated |
 | Recovery/offline charging | Not validated |
@@ -75,6 +75,6 @@ Normal images do not force USB rescue/developer mode or automatically enable SSH
 - `BRINGUP.md` — current build, release, checksum, and flashing workflow
 - `BRINGUP-LOG.md` — authoritative current state and ordered test queue
 - `BRINGUP-LOG-ARCHIVE.md` — summarized superseded diagnoses
-- `docs/HANDOVER.md` — session handover: status snapshot, device access playbook, active investigations, roadmap progress
+- `docs/HANDOVER.md` — SUPERSEDED 2026-11-19 (historical context only); the working handover now lives in `husky-verify/NEXT-SESSION-NOTES.md` on the bring-up host
 - `RESUME-NOTES.md` — current resume entry point
 - `dependencies.lock` — pinned third-party inputs and checksums

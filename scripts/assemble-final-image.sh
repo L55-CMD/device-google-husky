@@ -16,7 +16,7 @@ output_dir="${OUTPUT_DIR:-${repo_root}/out}"
 ota_input_dir="${OTA_INPUT_DIR:-${repo_root}/ota}"
 ota_dir="${OTA_DIR:-${repo_root}/ota-16}"
 artifacts_dir="${ARTIFACTS_DIR:-${repo_root}/artifacts}"
-work_dir="${WORK_DIR:-${repo_root}/workdir/forgejo-final}"
+work_dir="${WORK_DIR:-${repo_root}/workdir/final-image}"
 
 require_url() {
     local url="$1"

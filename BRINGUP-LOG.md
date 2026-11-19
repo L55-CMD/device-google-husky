@@ -1,5 +1,10 @@
 # Husky bring-up log
 
+> The "Current state" section below is dated 2026-11-10; the dated update
+> sections after it are newer. For the latest blocker status read the
+> NEWEST dated section, then `RESUME-NOTES.md` and the working handover in
+> `husky-verify/NEXT-SESSION-NOTES.md` (bring-up host).
+
 ## Current state — 2026-11-10
 
 ### Known-good coordinated revisions
@@ -245,13 +250,10 @@ with Stream ID 0 / AXI ID 0 on HSI0 (NOT the USB default stream 0x108; NOT
 the RNDIS gadget necessarily — usb@11210000 has no iommus prop at all and
 sysmmu@11040000 has **no `s2mpus` property**, unlike the other SysMMUs)
 triggers it 13.9s into userspace. On stock the pkvm<->host-iommu
-registration covers these tables; ours doesn't. Also noted: the CI
-vendor_dlkm modules.dep is NOT a real symbol-dependency file — ELF parsing
-(`husky-verify/tmp/elfdeps.py`) shows the true closure of
-{exynos-pd, pkvm-s2mpu-v9} is only FIVE modules (exynos-pd, pkvm-s2mpu-v9,
-phy-exynos-usbdrd-eusb-super, exynos-pd_hsi0, eusb_repeater); the 24-module
-closure from the CI dep file drags in dss/vh_sched/cmupmucal and must not be
-used as-is.
+registration covers these tables; ours doesn't. Also noted (RETRACTED
+2026-11-18, see CORRECTION below): the CI vendor_dlkm modules.dep claim —
+~~the CI modules.dep is NOT a real symbol-dependency file~~ — was WRONG;
+depmod's modules.dep is authoritative.
 
 **Next steps (kernel/DT work, next session):**
 1. Decide the fix direction: (a) investigate why the pkvm_s2mpu_of_link /
@@ -262,10 +264,10 @@ used as-is.
    `is_pkvm_initialized()` (module then loads at container start, exports
    the pkvm_s2mpu_of_link_v9 symbols samsung_iommu needs, no S2MPU
    enforcement, MFC still gets a real domain) — needs a kernel build.
-2. Ship only the TRUE 5-module closure + ELF-derived modules.dep (update
-   `scripts/make-pkvm-ramdisk-segment.sh` to compute deps from ELF symbol
-   tables, not the CI modules.dep).
-3. Commit the dir-entry fix (working tree) once the above lands.
+2. ~~Ship only the TRUE 5-module closure + ELF-derived modules.dep~~
+   **RETRACTED 2026-11-18** (see CORRECTION below): depmod's modules.dep
+   (25-module closure) is authoritative; do NOT modify
+   make-pkvm-ramdisk-segment.sh to use ELF-derived deps.
 
 **Option B investigation (2026-11-17 late, user chose full pKVM fix):**
 mechanism fully mapped from sources (lineage google-modules, lineage-23.2):
@@ -296,14 +298,14 @@ mechanism fully mapped from sources (lineage google-modules, lineage-23.2):
   modules.dep (25-module closure incl. dss/vh_sched) is authoritative
   after all; the segment script keeps using it. The ltonone test images
   therefore ship the depmod closure.
-- TEST IN FLIGHT: kernel-patches-husky branch `test-audio-restore-ltonone`
-  (+ manifest branch same name) = test-audio-restore with
-  CONFIG_LTO_NONE=y / LTO_CLANG_THIN=n in halium.config. Kernel CI builds
-  kernel.zip tagged `test-audio-restore-ltonone`; verify by splicing the
-  new Image + pkvm-s2mpu-v9.ko into the local init_boot/boot images
-  (tooling in husky-verify/tmp/) and dd-flashing. If the 13.9s HSI0 panic
-  is gone -> LTO confirmed as the breaker; if not, next suspects are the
-  host-stage-2 notifier wiring in the el2 module init path.
+- STATUS (2026-11-18 late): local splice test was INVALID (module
+  mismatch); device-CI redo (run 98, matched images) died EARLIER at 8.4s
+  ("Couldn't find data partition") because the CI-built boot ramdisk had
+  only 25 modules instead of 209 (modules.load empty). The LTO_NONE
+  verdict at the 13.9s mark is therefore STILL OPEN. Current blocker is
+  the 25-vs-209 module-selection bug in the device build, not the kernel.
+  See husky-verify/NEXT-SESSION-NOTES.md (2026-11-18 22:10 + 22:50
+  sections) for the next actions.
 
 **Phone state:** restored to r8-baseline-debug boot images on baseline
 super (boots, SSH OK). The test-audio-restore CI release is still valid;

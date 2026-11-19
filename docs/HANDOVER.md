@@ -1,5 +1,12 @@
 # Husky port — session handover (2026-11-10/11)
 
+> **SUPERSEDED (2026-11-19):** this handover is retained for historical
+> context (audio-injection mechanism details, binder wire-format findings).
+> The current working state, queue, and next actions live in
+> `husky-verify/NEXT-SESSION-NOTES.md` on the bring-up host, with the
+> authoritative port state in `BRINGUP-LOG.md`. Do not treat any "next
+> session", "queue", or phone-state entry below as current.
+
 > **2026-11-14 addendum #4 (audio live-injection — mechanism built, NEW
 > defect #7 found — READ FIRST):**
 > Session goal was handover-#3 step 1 (live-inject audio overlay, call test).
