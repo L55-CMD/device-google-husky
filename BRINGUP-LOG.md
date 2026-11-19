@@ -309,7 +309,97 @@ mechanism fully mapped from sources (lineage google-modules, lineage-23.2):
 super (boots, SSH OK). The test-audio-restore CI release is still valid;
 local patched init_boot images (attempt1/2/min) are in `husky-verify/tmp/`.
 
+## 2026-11-19 — integration of the validated build + RETRACTION of the LTO claims
+
+### Correction first (supersedes the 2026-11-19 verdict section on the
+### test-audio-restore-ltonone branch)
+RETRACTED: "CONFIG_LTO_CLANG_THIN confirmed as the EL2 S2MPU notifier
+breaker" and "LTO_NONE is the verified fix". The user extracted the actual
+effective configs: run-98's kernel AND the rebuilt integrated kernel both
+contain CONFIG_LTO_CLANG_THIN=y. The halium.config LTO_NONE fragment is
+inert in the GKI build; the "LTO" experiment compared two kernels with
+identical effective configs and isolated nothing. The beneficial run-98
+delta vs the panicking kernels (test-r8-lazylink lineage: g0b2699b6e265,
+g7e26db69eb15) is the PATCH-STACK difference (halium-husky 0f72552
+lineage) — UNIDENTIFIED, pending a dedicated bisect. Run 98 is retained
+as a validated known-good image set; its beneficial source delta is
+unidentified. "ltonone" names are historical misnomers; the inert
+fragment stays as part of the validated source tree.
+
+### What remains TRUE and validated (run 98, user-tested 2026-11-19)
+Full matched 5-image flash (incl. vendor_kernel_boot — see bootloop root
+cause below) boots past the 13.9s HSI0 SysMMU PTW panic: pkvm_s2mpu_v9 +
+samsung_iommu_v9 + samsung_iommu_group loaded, 26 sysmmus bound incl.
+11040000 (HSI0), mfc-core bound to MFC-0, dwc3/RNDIS alive, zero
+S2MPU/access-fault/panic lines in live dmesg. YouTube playback WORKING.
+Defect #1 bottom-region scanout artifact GONE (mechanism UNKNOWN; the
+Lomiri quirk matrix / force60 / wqhd queue is MOOT — do not rerun).
+Evidence: husky-verify/tmp/ltonone-full-20261119-105157/. kver
+gc9a0580a0791; hashes: boot 6764e3c5...01eef, init_boot 3476aad7...440dd,
+vendor_kernel_boot da3e1db5...e78f, vendor_boot a3a44eba...872c, dtbo
+3dba3e31...4798c (boot-images.zip 7276a00c, MANIFEST device b808d33).
+
+### 2026-11-18 bootloop root cause (SOLVED — packaging/process, not kernel)
+"Couldn't find data partition" at 8.4s was an INCOMPLETE FLASH: only
+boot+init_boot were dd'd; the phone kept r8-baseline's vendor_kernel_boot
+whose modules live under the old kver dir. The halium initrd only reads
+/lib/modules/<running-kver>/modules.load; on mismatch its mv-logic buries
+modules.load one level down -> only the 25 flat pkvm .ko visible -> UFS
+never probed. The device CI images were never at fault. Guard:
+husky-verify/preflight-boot-images.sh (structural matched-set gate;
+PASSes good sets, REFUSES the stale-vkb scenario — negative-tested) wired
+into the dd flash scripts; see also the BRINGUP.md flashing warning.
+
+### Integrated mainline baseline (CI-verified, OFFLINE-VERIFIED, NOT flashed)
+- kernel-patches-husky: halium-husky = test-audio-restore = 22c33ed
+  (cherry-pick of 24ffa8d; tree byte-identical to the validated patches
+  tree; fragment inert per Correction).
+- lineage-kernel-manifest-husky: test-audio-restore = a979a7a
+  (kernel-patches ref -> refs/heads/test-audio-restore).
+- device-google-husky: test-audio-restore = ca7a9ea (= 67bc584 cherry-pick
+  of b808d33 recovery pin build 603, kept separate; + 1ce89c5/ca7a9ea
+  buildlog-on-failure diagnostics cherry-picked after the first
+  integration run 44521196681 failed silently).
+- kernel.zip (manifest repo release, tag test-audio-restore) digest
+  8594fe4574e4a9977cdc3ef9a4244049fd7a101bcc0c718f2aeecba041d484e6;
+  Image kver 6.1.145-android14-11-g799ecb77416a (per-run workspace hash —
+  internal match is the requirement, not equality with run-98's kver);
+  vendor_kernel_boot + initramfs both carry the 209-module tree with
+  modules.load under g799ecb77416a.
+- Device CI run 44612802506 (debug) green; boot-images.zip digest
+  fcb8b563aea97b13cd198f756984d0b5741bbbeeb87b6d5793e3ba8e9b9a0c6a.
+  Image hashes: boot.img 09891f5e540eab9f1307e375948203c3738777edf028addddb89b8d3ccc58c56,
+  init_boot.img e6b1f6e8f78e2aaa5091146892e6ddb20969100911db92f8940829127b27e01d,
+  vendor_kernel_boot.img 0fbce5ae4dd03cc448c51a4dc3c3dc585d26a85a6c75f7a811c9d4c23660817d,
+  vendor_boot.img bdecf19d40d0485ba7433eb0bbd9d9336a83f119fbdd288c341f9d330a9bfb18,
+  dtbo.img 3dba3e31d69264dc1519d1cad24dc5dda294c96a1d4d9fbe526f9cb379a4798c.
+  Offline checks: preflight-boot-images.sh FULL PASS; MANIFEST device
+  ca7a9ea / manifest a979a7a / patches 22c33ed / kernel tag
+  test-audio-restore; boot-images.zip sha256 OK. Local copies:
+  husky-kernels/kernel-test-audio-restore.zip, husky-flash/tar-audio-lto/.
+  NOTE: effective kernel config is CONFIG_LTO_CLANG_THIN=y (see
+  Correction) — do not reject these artifacts for "not being LTO_NONE".
+- Preservation: local tags known-good-ltonone-run98 on all three repos
+  (run-98 tips); run-98 images + evidence preserved on the bring-up host.
+
+### Status / next
+- Defect #6 (MFC/IOMMU): open ONLY for the clean-shutdown test (one
+  reboot, user decision). Defect #1: resolved on this build (mechanism
+  UNKNOWN). Defect #2/#7 audio: unchanged (stub work queued). All
+  unlisted hardware UNTESTED.
+- Next discriminating experiment (own session, one variable): bisect the
+  patch-stack delta halium-husky(0f72552) vs test-r8-lazylink(6d9a427)
+  to identify the beneficial commit(s); until then treat the whole
+  integrated family as the validated unit.
+- Do NOT flash the integrated artifacts merely because CI is green; the
+  phone already runs the validated build and was not accessed during
+  integration.
+
 ## Next display tests
+
+> MOOT 2026-11-19: the bottom-region artifact is GONE on the validated
+> build (user-verified; mechanism UNKNOWN). Retained below for history
+> only — do not schedule these runs unless the artifact regresses.
 
 Run each configuration from a clean boot or a LightDM restart, and record a photo, compositor log, composer3 logcat, and DRM state:
 
