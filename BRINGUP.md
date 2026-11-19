@@ -83,6 +83,18 @@ fastboot reboot
 
 If the Android container image is not already on userdata from an earlier install, boot the matching recovery and push `android-rootfs.img` to the userdata root before starting UT.
 
+### Partial flashes break booting — always flash the complete matched set
+
+`vendor_kernel_boot` carries the full `/lib/modules/<kver>` tree that the
+halium initrd loads at boot; `init_boot` only adds the flat pKVM closure.
+Flashing a subset (e.g. only `boot` + `init_boot`) pairs a new kernel with
+a stale module tree: on kver mismatch the initrd cannot find
+`modules.load` and storage never probes ("Couldn't find data partition",
+8.4s panic — 2026-11-18 incident, NEXT-SESSION-NOTES.md 2026-11-19). All
+five images (`boot`, `init_boot`, `vendor_kernel_boot`, `vendor_boot`,
+`dtbo`) must come from the same CI run. The bring-up host's dd scripts run
+`preflight-boot-images.sh` to enforce this structurally before flashing.
+
 ## Test discipline
 
 Record the release tag, all three repository revisions, test result, and relevant logs for every hardware test. Use the ordered matrix in `BRINGUP-LOG.md`; do not mark a feature working based only on a related device port.
