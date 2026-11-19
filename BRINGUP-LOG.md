@@ -314,7 +314,15 @@ mechanism fully mapped from sources (lineage google-modules, lineage-23.2):
 super (boots, SSH OK). The test-audio-restore CI release is still valid;
 local patched init_boot images (attempt1/2/min) are in `husky-verify/tmp/`.
 
-## 2026-11-19 — LTO_NONE on-device test: PASS; CLANG_THIN confirmed as the EL2 notifier breaker
+## 2026-11-19 — LTO_NONE on-device test: PASS; CLANG_THIN confirmed...
+
+> **CORRECTION 2026-11-19: RETRACTED.** Effective configs (user-extracted)
+> show CONFIG_LTO_CLANG_THIN=y in this kernel and in the panicking ones —
+> the LTO_NONE fragment is inert; "CLANG_THIN confirmed as breaker" and
+> "LTO_NONE verified fix" are WRONG. The validated facts (boots past
+> 13.9s, full IOMMU chain, YouTube, display artifact gone) stand; the
+> beneficial mechanism is UNKNOWN (patch-stack delta, pending bisect).
+> Full retraction: test-audio-restore branch BRINGUP-LOG 2026-11-19.
 
 Full matched run-98 set (boot/init_boot/vendor_kernel_boot/vendor_boot/dtbo
 to slot b, one reboot; see NEXT-SESSION-NOTES 2026-11-19 for preflight +

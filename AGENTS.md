@@ -70,6 +70,24 @@ Replace "Current state" with:
 Keep Current state below 80 lines. Append historical detail to
 BRINGUP-LOG.md instead.
 
+## CORRECTION 2026-11-19 (supersedes the verdicts recorded below)
+
+RETRACTED: "CONFIG_LTO_CLANG_THIN CONFIRMED as the breaker" and "LTO_NONE
+is the verified fix". The user extracted the actual effective configs:
+run-98's kernel AND the rebuilt integrated kernel both contain
+CONFIG_LTO_CLANG_THIN=y — the halium.config LTO_NONE fragment is inert in
+the GKI build, and the "LTO" experiment compared identical effective
+configs. The beneficial run-98 delta vs the panicking kernels is the
+PATCH-STACK difference (halium-husky lineage vs test-r8-lazylink lineage),
+UNIDENTIFIED pending a dedicated bisect. Run 98 remains a VALIDATED
+known-good image set (boots, no 13.9s panic, YouTube, display artifact
+gone); its beneficial source delta is unidentified. The integrated
+mainline baseline (patches 22c33ed / manifest a979a7a / device ca7a9ea +
+docs e677877) and the full retraction live on the test-audio-restore
+branch; see its BRINGUP-LOG 2026-11-19 section. The "ltonone" branch name
+is a historical misnomer; the inert fragment stays as part of the
+validated source tree.
+
 ## Current state
 2026-11-19T11:00Z
 
@@ -85,9 +103,11 @@ BRINGUP-LOG.md instead.
   bound to 1a4d0000.MFC-0; dwc3 gadget + RNDIS/SSH alive (the HSI0 master
   that used to fault). Live dmesg: ZERO s2mpu/access-fault/PTW/panic lines;
   the 13.5-14.5s window shows normal ext4/overlay mounts.
-- VERDICT: CONFIG_LTO_CLANG_THIN(+CFI) CONFIRMED as the breaker of the EL2
-  S2MPU host-stage-2 notifier path (hypothesis open since 2026-11-17).
-  LTO_NONE is currently the only known-booting config for this chain.
+- VERDICT (RETRACTED 2026-11-19 — see CORRECTION above): the earlier
+  claim "CONFIG_LTO_CLANG_THIN(+CFI) CONFIRMED as the breaker of the EL2
+  S2MPU host-stage-2 notifier path; LTO_NONE is the only known-booting
+  config" is WRONG — effective configs of this kernel and the panicking
+  kernels all carry CONFIG_LTO_CLANG_THIN=y; the mechanism is UNKNOWN.
 - Root cause of the 2026-11-18 bootloop (separate issue, SOLVED): incomplete
   flash — vendor_kernel_boot_b had not been re-flashed; halium initrd buried
   modules.load on kver mismatch. Device build was never at fault.
