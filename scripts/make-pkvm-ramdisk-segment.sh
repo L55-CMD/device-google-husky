@@ -64,14 +64,15 @@ moddir="${modroot}${sub:+/${sub}}"
 
 dep_file="$(mktemp)"
 builtin_file="$(mktemp)"
-trap 'rm -f "${dep_file}" "${builtin_file}"' EXIT
+ship_file="$(mktemp)"
+trap 'rm -f "${dep_file}" "${builtin_file}" "${ship_file}"' EXIT
 
 dfs "cat ${moddir}/modules.dep" > "${dep_file}"
 # modules.builtin may be absent on flattened images; treat as empty.
 dfs "cat ${moddir}/modules.builtin" > "${builtin_file}" || true
 
 staging="$(mktemp -d)"
-trap 'rm -rf "${staging}"; rm -f "${dep_file}" "${builtin_file}"' EXIT
+trap 'rm -rf "${staging}"; rm -f "${dep_file}" "${builtin_file}" "${ship_file}"' EXIT
 
 # The kernel calls `/system/bin/modprobe -q -d /lib/modules/ -- <name>`;
 # upstream kmod uses the -d directory as-is -> FLAT layout in /lib/modules.
@@ -82,7 +83,11 @@ ln -s /bin/kmod "${staging}/system/bin/modprobe"
 # and stage every remaining .ko. Any dependency that is neither shipped
 # nor built-in would fail modprobe at boot and wedge pKVM again - fail the
 # build loudly instead.
-mapfile -t ship_list < <(python3 - "$dep_file" "$builtin_file" <<'PY'
+# The resolver output feeds everything below; capturing it via process
+# substitution (< <(python3 ...)) would SILENTLY TRUNCATE the module list
+# if python exits non-zero mid-run - mapfile still succeeds on partial
+# input. Capture to a file and check the exit code explicitly.
+if ! python3 - "$dep_file" "$builtin_file" > "${ship_file}" <<'PY'
 import sys
 
 dep_path, builtin_path = sys.argv[1], sys.argv[2]
@@ -137,12 +142,27 @@ if missing:
 for mod in sorted(ship):
     print(mod)
 PY
-)
+then
+    echo "module dependency resolver failed (see diagnostics above)" >&2
+    exit 1
+fi
+
+# Normalize CRLF: a resolver run under native Windows python prints \r\n
+# line endings.
+mapfile -t ship_list < <(tr -d '\r' < "${ship_file}")
 
 if [ "${#ship_list[@]}" -eq 0 ]; then
     echo "dependency closure resolved to an empty module set" >&2
     exit 1
 fi
+# Partial-output guard: every resolved entry must be a non-empty .ko name;
+# anything else means the resolver output was truncated or corrupted.
+for mod in "${ship_list[@]}"; do
+    case "${mod}" in
+        *.ko) ;;
+        *) echo "dependency resolver produced invalid output: '${mod}'" >&2; exit 1 ;;
+    esac
+done
 
 for mod in "${ship_list[@]}"; do
     dfs "dump ${moddir}/${mod} ${staging}/lib/modules/${mod}" > /dev/null
