@@ -94,15 +94,8 @@ if [ -n "${deviceinfo_bootimg_prebuilt_dtb:-}" ]; then
     cp -f "${dtb_img}" "${port_tree}/${deviceinfo_bootimg_prebuilt_dtb}"
 fi
 
-git_clone_if_missing() {
-    local url="$1"
-    local branch="$2"
-    local target="$3"
-    if [ -d "${target}/.git" ]; then
-        return
-    fi
-    git clone --depth 1 --branch "${branch}" "${url}" "${target}"
-}
+# shellcheck source=scripts/git-clone-lib.sh
+source "${repo_root}/scripts/git-clone-lib.sh"
 
 download_verified() {
     local url="$1"
