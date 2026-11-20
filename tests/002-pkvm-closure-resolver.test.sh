@@ -39,7 +39,9 @@ dep1.ko:
 exynos-pd.ko: dep1.ko
 pkvm-s2mpu-v9.ko: exynos-pd.ko
 EOF
-: > "${fix}/modules.builtin"
+mkdir -p "${fix}/tree/lib/modules"
+mv "${fix}/modules.dep" "${fix}/tree/lib/modules/modules.dep"
+: > "${fix}/tree/lib/modules/modules.builtin"
 for m in dep1 exynos-pd pkvm-s2mpu-v9; do
     printf 'fake module %s\n' "${m}" > "${fix}/mods/${m}.ko"
 done
@@ -72,7 +74,7 @@ echo "resolvable closure: all 3 modules staged"
 # --- case 2 (negative): unresolvable dependency must fail the build ---------
 fix2="${work}/fixture2"
 cp -r "${fix}" "${fix2}"
-cat > "${fix2}/modules.dep" <<'EOF'
+cat > "${fix2}/tree/lib/modules/modules.dep" <<'EOF'
 exynos-pd.ko: not-shipped-anywhere.ko
 pkvm-s2mpu-v9.ko: exynos-pd.ko
 EOF

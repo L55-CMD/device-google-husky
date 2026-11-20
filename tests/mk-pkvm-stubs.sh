@@ -7,8 +7,8 @@
 # Fixture layout:
 #   ls.txt           output of `debugfs -R "ls -p /lib/modules"` (parsable
 #                    format: /<ino>/<mode>/<uid>/<gid>/<name>/ + size/ or /)
-#   modules.dep      content served for `cat .../modules.dep`
-#   modules.builtin  content served for `cat .../modules.builtin`
+#   tree/<img path>  file contents served for `cat <path>`; missing paths
+#                    exit 1 like a failed debugfs read
 #   mods/<name>.ko   files served for `dump .../<name>.ko <dst>`
 # Environment read by the stubs:
 #   STUB_DEBUGFS_LOG   if set, every debugfs -R command is appended to it
@@ -40,8 +40,13 @@ case "${cmd}" in
         cat "${fix}/ls.txt"
         ;;
     cat\ /lib/modules/*|cat\ /lib/modules)
-        name="$(basename "${cmd}")"
-        cat "${fix}/${name}"
+        rel="${cmd#cat }"
+        if [ -f "${fix}/tree${rel}" ]; then
+            cat "${fix}/tree${rel}"
+        else
+            echo "cat: ${rel}: No such file or directory" >&2
+            exit 1
+        fi
         ;;
     dump\ *)
         # dump <src> <dst>

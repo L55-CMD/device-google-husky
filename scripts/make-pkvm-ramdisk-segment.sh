@@ -59,8 +59,32 @@ modroot="/lib/modules"
 # (modules_install default). Detect a subdir from the image; otherwise
 # use the flat dir itself. Either way we stage FLAT, because
 # CONFIG_PKVM_MODULE_PATH makes modprobe use /lib/modules/ as-is.
-sub="$(dfs "ls -p ${modroot}" | awk -F/ 'NF == 7 && $6 != "." && $6 != ".." {print $6; exit}')"
-moddir="${modroot}${sub:+/${sub}}"
+#
+# debugfs 'ls -p' lines are /<ino>/<mode>/<uid>/<gid>/<name>/ followed by
+# <size>/ for files or an extra / for directories. Only directory entries
+# can be a <kver> subdir. The old 'NF == 7' parse never matched this
+# format (leading/trailing slashes make it NF=8 for files), so subdir
+# detection silently never fired; parse the mode field instead.
+#
+# Detection must be deterministic: collect ALL candidates, and fail on an
+# ambiguous image with several <kver>-looking subdirs instead of picking
+# one in debugfs directory order.
+mapfile -t subdirs < <(dfs "ls -p ${modroot}" \
+    | awk -F/ '$3 ~ /^04/ && $6 != "" && $6 != "." && $6 != ".." {print $6}' \
+    | LC_ALL=C sort -u)
+case "${#subdirs[@]}" in
+    0)
+        moddir="${modroot}"
+        ;;
+    1)
+        moddir="${modroot}/${subdirs[0]}"
+        ;;
+    *)
+        echo "ambiguous module dirs under ${modroot} in ${flatten_img}: ${subdirs[*]}" >&2
+        echo "expected flat modules or exactly one <kver> subdir; refusing to guess" >&2
+        exit 1
+        ;;
+esac
 
 dep_file="$(mktemp)"
 builtin_file="$(mktemp)"
