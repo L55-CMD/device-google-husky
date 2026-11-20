@@ -94,6 +94,7 @@ if [ -n "${deviceinfo_bootimg_prebuilt_dtb:-}" ]; then
     cp -f "${dtb_img}" "${port_tree}/${deviceinfo_bootimg_prebuilt_dtb}"
 fi
 
+# shellcheck disable=SC1091
 # shellcheck source=scripts/build-helpers.sh
 source "${repo_root}/scripts/build-helpers.sh"
 

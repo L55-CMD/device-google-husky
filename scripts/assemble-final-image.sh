@@ -7,6 +7,7 @@ cd "${repo_root}"
 # Coordinated dependency versions and checksums.
 # shellcheck disable=SC1091
 source "${repo_root}/dependencies.lock"
+# shellcheck disable=SC1091
 # shellcheck source=scripts/build-helpers.sh
 source "${repo_root}/scripts/build-helpers.sh"
 
