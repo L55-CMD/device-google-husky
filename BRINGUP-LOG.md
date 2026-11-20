@@ -438,6 +438,28 @@ default action. Full detail: `husky-verify/NEXT-SESSION-NOTES.md`
 2026-11-20 section. Next discriminating action: capture `journalctl -b`
 plus lightdm/xsession logs from a bad boot before rebooting.
 
-**Phone state:** new integrated baseline running, healthy (Lomiri greeter,
-container, RNDIS/SSH). Defect #6 acceptance spot-checks (YouTube etc.)
-expected identical to run-98; not yet re-run.
+**Defect #6 CLOSED (TESTED 2026-11-20 evening):** YouTube playback WITH
+AUDIO on the integrated baseline passed with no panic and no reboot
+(user-verified). The integrated build is recorded as ON-DEVICE
+KNOWN-GOOD, superseding run-98.
+
+**Known-good recording + promotion (2026-11-20):**
+- Coordinated tag `known-good-r8-20261120` pushed on all three repos:
+  device @660bfb3 (this branch), manifest @a979a7a, patches @22c33ed.
+- kernel-patches-husky: branch `main` created @22c33ed (device CI
+  resolves patches by branch name).
+- lineage-kernel-manifest-husky: branch `main` fast-forwarded
+  98068de..a979a7a; its kernel CI is rebuilding the identical source to
+  publish kernel.zip under release tag `main`.
+- PENDING (mechanical, do after the manifest `main` kernel.zip exists):
+  fast-forward device `main` to this branch's head (old main 107090e is
+  an ancestor, FF-verified). Device CI for `main` then resolves: manifest
+  release `main` + manifest heads/main + patches heads/main — all in
+  place except the release artifact.
+
+**Defect #8 remains OPEN (intermittent):** post-cold-off Lomiri
+crash-loop boot; capture procedure prepared in
+husky-verify/defect8-capture/ (not yet run; awaits user go).
+
+**Phone state:** integrated baseline running, healthy (Lomiri greeter,
+container, RNDIS/SSH). This is the on-device known-good build.

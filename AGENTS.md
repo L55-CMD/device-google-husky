@@ -92,47 +92,48 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-19T21:10Z
+2026-11-20T19:15Z
 
-- Commits (integrated family, all PUSHED): kernel-patches-husky
-  halium-husky = test-audio-restore = 22c33ed (cherry-pick of 24ffa8d;
-  tree byte-identical to validated 24ffa8d — the LTO_NONE fragment is
-  INERT, see CORRECTION above); lineage-kernel-manifest-husky
-  test-audio-restore = a979a7a; device-google-husky test-audio-restore =
-  ca7a9ea (67bc584 recovery-pin cherry-pick + 1ce89c5/ca7a9ea buildlog
-  diagnostics). device repo also carries this AGENTS.md + BRINGUP updates
-  as docs commits.
-- RUN-98 (validated known-good, RETAINED): full matched 5-image debug set
-  flashed 2026-11-19 10:51Z; boots past 13.9s, lsmod pkvm_s2mpu_v9 +
-  samsung_iommu_v9 + group, 26 sysmmus bound incl. HSI0 11040000,
-  mfc-core bound, dwc3/RNDIS alive, ZERO s2mpu/access-fault/PTW/panic in
-  live dmesg; kver gc9a0580a0791. Hashes: boot 6764e3c5...01eef,
-  init_boot 3476aad7...440dd, vendor_kernel_boot da3e1db5...e78f,
-  vendor_boot a3a44eba...872c, dtbo 3dba3e31...4798c (zip 7276a00c).
-  User-tested: YouTube WORKING; defect #1 bottom-screen artifact GONE
-  (mechanism UNKNOWN). Evidence: husky-verify/tmp/ltonone-full-20261119-
-  105157/. Effective config: CONFIG_LTO_CLANG_THIN=y (see CORRECTION).
-- INTEGRATED REBUILD (offline-verified, NOT flashed): kernel.zip tag
-  test-audio-restore digest 8594fe45...4e6 (Image kver g799ecb77416a;
-  internal 209-module trees consistent). Device run 44612802506 debug
-  green: boot-images.zip fcb8b563...0c6a; boot.img 09891f5e...58c56,
-  init_boot e6b1f6e8...01d, vendor_kernel_boot 0fbce5ae...17d,
-  vendor_boot bdecf19d...18, dtbo 3dba3e31...98c. preflight-boot-images.sh
-  FULL PASS; MANIFEST device ca7a9ea / manifest a979a7a / patches 22c33ed.
-  Local copies: husky-kernels/kernel-test-audio-restore.zip,
-  husky-flash/tar-audio-lto/.
+- ON-DEVICE KNOWN-GOOD BASELINE (TESTED 2026-11-20): integrated family
+  kernel-patches-husky 22c33ed / manifest a979a7a / device test-audio-
+  restore (build code ca7a9ea; docs through 660bfb3+), coordinated tag
+  `known-good-r8-20261120` on all three repos. CI run 44612802506 debug
+  set (boot-images fcb8b563, kver g799ecb77416a) flashed boot-images-
+  only to slot b; pkvm chain verified (pkvm_s2mpu_v9 @2.4s,
+  samsung_iommu_v9 21 refs, 25 sysmmus incl HSI0, mfc-core on MFC-0,
+  zero fault/panic lines). DEFECT #6 CLOSED: YouTube with audio passed,
+  no panic/reboot. Clean-shutdown test PASSED (normal unmount, no
+  iommu_release_device panic). Evidence: husky-verify/NEXT-SESSION-NOTES.md
+  2026-11-20 section; BRINGUP-LOG 2026-11-20.
+- Promotion status: patches repo branch `main` created @22c33ed; manifest
+  repo branch `main` FF'd to a979a7a (its kernel CI is republishing
+  kernel.zip as release `main`). PENDING: FF device `main` to this
+  branch's head once the manifest `main` kernel.zip exists (FF-verified,
+  old main 107090e is an ancestor). Details: BRINGUP-LOG 2026-11-20.
+- RUN-98 (superseded by the integrated baseline, RETAINED as fallback):
+  kver gc9a0580a0791, same on-device verdicts (boots past 13.9s, pkvm
+  chain bound, YouTube working, defect #1 artifact gone). Artifacts:
+  husky-flash/ltonone-ci/, evidence husky-verify/tmp/ltonone-full-
+  20261119-105157/. Effective config CONFIG_LTO_CLANG_THIN=y (CORRECTION
+  above applies to both).
+- Defect #1 bottom-screen artifact: RESOLVED on this baseline (mechanism
+  UNKNOWN; force60/wqhd queue MOOT). Defect #8 OPEN (intermittent):
+  first boot after cold poweroff may crash-loop Lomiri (~65s lightdm
+  restart cycle, black screen, no host RNDIS); identical later boot
+  healthy → startup race. GOTCHA: with Lomiri down, a short power press
+  powers the phone OFF via logind. Capture procedure: husky-verify/
+  defect8-capture/ (prepared, NOT started).
 - 2026-11-18 bootloop root cause (SOLVED, separate): incomplete flash —
-  stale vendor_kernel_boot_b; halium initrd buries modules.load on kver
-  mismatch. Guard: husky-verify/preflight-boot-images.sh (PASSes good
-  sets, REFUSES stale-vkb — negative-tested); wired into flash scripts;
-  BRINGUP.md warns.
-- Phone: run-98 known-good debug on slot b, user-verified (YouTube,
-  display artifact absent). Do NOT reflash merely because CI is green.
-- Defect #6 open ONLY for the clean-shutdown test. Defect #1 display
-  artifact resolved on this build (mechanism UNKNOWN; force60/wqhd queue
-  MOOT). Defect #7 audio stub work queued (helpers husky-verify/
-  audio-20261112/). Unlisted hardware remains UNTESTED.
-- Next discriminating actions: (1) clean-shutdown test on run-98 build
-  (user decision, one reboot); (2) isolate the beneficial patch-stack
-  delta (bisect halium-husky lineage vs test-r8-lazylink lineage) —
-  SCHEDULE AS ITS OWN EXPERIMENT, do not bundle; (3) then defect #7.
+  stale vendor_kernel_boot_b. Guard: husky-verify/preflight-boot-images.sh
+  (wired into flash scripts; BRINGUP.md warns). Flash over root SSH via
+  /userdata (phablet sudo now needs a password; /tmp is PrivateTmp).
+- RAMOOPS FACT: cold poweroff wipes console-ramoops; use the persistent
+  journal (journalctl -b -N) for shutdown verdicts.
+- Phone: integrated baseline (on-device known-good) running, healthy.
+  Defect #7 audio stub work queued (husky-verify/audio-20261112/).
+  Unlisted hardware remains UNTESTED.
+- Next discriminating actions: (1) finish device-main promotion once the
+  manifest `main` kernel.zip exists (mechanical, FF); (2) defect #8
+  capture series (awaits user go); (3) isolate the beneficial patch-stack
+  delta (bisect halium-husky vs test-r8-lazylink lineage) — OWN
+  EXPERIMENT, do not bundle; (4) then defect #7.

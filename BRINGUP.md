@@ -6,11 +6,15 @@ This guide describes the current GitHub-based normal/debug build pipeline. It re
 
 | Repository | Baseline revision |
 |---|---|
-| `device-google-husky` | cleaned `main` branch after validation |
-| `lineage-kernel-manifest-husky` | `c71fde597bcf06374d26972c70f19c5e7f719d63` |
-| `kernel-patches-husky` | `6d9a42798c9577508ee7dd227bb8976d05cac48e` |
+| `device-google-husky` | tag `known-good-r8-20261120` (= `test-audio-restore`; promotion to `main` pending the manifest `main` kernel.zip, then fast-forward) |
+| `lineage-kernel-manifest-husky` | `a979a7abfe8800b845d653c6abdd9fadc96a0257` (= tag `known-good-r8-20261120` = branch `main`) |
+| `kernel-patches-husky` | `22c33ed85ad235fdc2bc09d4ef1a89379f5a207f` (= tag `known-good-r8-20261120` = branches `halium-husky`/`test-audio-restore`/`main`) |
 
-The historical working device revision `a9d9187556e684352f26f21370c5cf90b259f14d` is preserved by the `known-good-r8-20261110` tag.
+This baseline is validated ON-DEVICE (2026-11-20): boots, pKVM/IOMMU
+chain bound, YouTube with audio (defect #6 closed), clean shutdown.
+Details: BRINGUP-LOG.md 2026-11-20.
+
+The historical working device revision `a9d9187556e684352f26f21370c5cf90b259f14d` is preserved by the `known-good-r8-20261110` tag; run-98 is preserved by local tags `known-good-ltonone-run98` (not pushed).
 
 ## Normal and debug images
 
