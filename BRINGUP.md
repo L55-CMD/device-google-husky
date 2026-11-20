@@ -38,6 +38,7 @@ Do not replace these inputs with floating `lastSuccessfulBuild` URLs or a silent
 ```bash
 ./scripts/validate-overlay.sh
 bash -n scripts/*.sh build.sh
+tests/run-tests.sh
 ```
 
 Run ShellCheck if it is installed:
@@ -45,6 +46,14 @@ Run ShellCheck if it is installed:
 ```bash
 shellcheck scripts/*.sh build.sh
 ```
+
+`tests/run-tests.sh` runs the script-level unit/negative tests (boot-image
+recompression failure handling, pKVM closure resolver, release digest
+selection, tool-clone revision checks, release artifact completeness, and
+- when `husky-verify` is checked out next to this repo - the flash-guard
+preflight against synthetic and real image sets). Tests whose fixtures
+live outside the repo skip themselves. The CI preflight job runs the same
+suite.
 
 ## CI build
 
