@@ -56,6 +56,12 @@ jobs:
       - name: Overlay validation
         run: ./scripts/validate-overlay.sh
 
+      - name: Script tests
+        # tests/run-tests.sh: unit/negative tests for the build scripts;
+        # tests that need out-of-repo fixtures (husky-verify flash guards,
+        # build-tools tarball) skip themselves.
+        run: tests/run-tests.sh
+
   final-artifacts:
     needs: preflight
     strategy:
