@@ -409,3 +409,35 @@ Run each configuration from a clean boot or a LightDM restart, and record a phot
 4. quirk `false`, overlays `false`
 
 Do not alter GridUnit/DPR until scanout geometry is correct. Only test refresh-rate and native-resolution changes after removing framebuffer-debug contamination and capturing the baseline above.
+
+
+## 2026-11-20 — Integrated baseline on-device; clean-shutdown PASS; new flaky defect #8
+
+**Flash (TESTED):** CI run 44612802506 debug set (device ca7a9ea / manifest
+a979a7a / patches 22c33ed, kernel kver 6.1.145-android14-11-g799ecb77416a)
+flashed boot-images-only to slot b 2026-11-20 18:22Z; per-image sha256
+verified phone-side; preflight matched-set gate PASSED (flat 25-.ko pkvm
+closure in init_boot; 209-module vendor_kernel_boot tree at kver).
+
+**Post-boot verification (TESTED):** identical to run-98 criteria — pkvm_s2mpu_v9
+@2.4s, samsung_iommu_v9 with 21 domain refs, 25 sysmmus bound incl HSI0,
+mfc-core on MFC-0, mali s2mpu @16.2s, zero S2MPU/PTW/panic lines.
+
+**Clean-shutdown test (TESTED):** `systemctl poweroff` → normal unmount
+sequence, no panic, no hang. The `iommu_release_device` NULL-domain
+shutdown-panic suspect did NOT reproduce (consistent with samsung_iommu_v9
+loaded with real domains). Ramoops is wiped by cold poweroff — post-poweroff
+pstore is never available; use the persistent journal for shutdown verdicts.
+
+**Defect #8 (UNKNOWN, flaky):** the first boot after a cold poweroff
+crash-looped Lomiri (lightdm restarting ~every 65s, black screen, no host
+RNDIS reachability despite the phone-side gadget reporting up); a later boot
+of the same images/slot was fully healthy → startup race. Also observed:
+with Lomiri down, a short power press powers the phone off via logind's
+default action. Full detail: `husky-verify/NEXT-SESSION-NOTES.md`
+2026-11-20 section. Next discriminating action: capture `journalctl -b`
+plus lightdm/xsession logs from a bad boot before rebooting.
+
+**Phone state:** new integrated baseline running, healthy (Lomiri greeter,
+container, RNDIS/SSH). Defect #6 acceptance spot-checks (YouTube etc.)
+expected identical to run-98; not yet re-run.
