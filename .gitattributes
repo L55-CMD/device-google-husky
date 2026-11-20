@@ -1,0 +1,6 @@
+# Line-ending policy: shell scripts and patches must be LF in every
+# checkout. CRLF working copies (Windows autocrlf) break `git apply` of
+# the build-tools patches and ShellCheck (SC1017), and have historically
+# stripped executable bits in this bring-up (docs/HANDOVER.md §2 gotcha).
+*.sh    text eol=lf
+*.patch text eol=lf
