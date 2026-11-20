@@ -7,3 +7,11 @@
  
  TMPDOWN=$(realpath $1)
  KERNEL_OBJ=$(realpath $2)
+@@ -74,6 +74,7 @@
+     grep -q "slotselect" "$HERE/ramdisk-recovery-overlay/system/etc/recovery.fstab" 2>/dev/null && HAS_AB_SLOTS=true || true
+ 
+     fakeroot -- bash <<EOF
++set -eo pipefail
+ gzip -dc "$RECOVERY_RAMDISK" | cpio -i
+ if [[ -n "$deviceinfo_unified_recovery_ui_density" && "$deviceinfo_unified_recovery_ui_density" != "mdpi" ]]; then
+     cp "$TMPDOWN/halium_bootable_recovery/res-$deviceinfo_unified_recovery_ui_density/images"/* "$TMPDOWN/ramdisk-recovery/res/images"
