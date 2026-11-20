@@ -34,9 +34,14 @@ if [ -n "${KERNEL_ZIP_SHA256:-}" ] && [ "${actual_sha256}" != "${KERNEL_ZIP_SHA2
     release_tag="${KERNEL_RELEASE_TAG:?KERNEL_RELEASE_TAG is required when KERNEL_ZIP_SHA256 is set}"
     release_repo="$(printf '%s' "${KERNEL_REGISTRY_BASE:?KERNEL_REGISTRY_BASE is required}" \
         | sed -E 's#^https://github.com/([^/]+/[^/]+)/releases/download.*#\1#')"
-    current_digest="$(curl -fsSL --retry 3 \
-        "https://api.github.com/repos/${release_repo}/releases/tags/${release_tag}" \
-        | grep -o '"digest": *"sha256:[a-f0-9]\{64\}"' | head -n 1 | cut -d'"' -f4 | cut -d: -f2)"
+    # Select the digest of the kernel.zip ASSET by name. Never take the
+    # first digest in the JSON: a rolling tag carries several assets, and
+    # positional selection can pin the wrong artifact.
+    release_json="$(mktemp)"
+    trap 'rm -f "${release_json}"' EXIT
+    curl -fsSL --retry 3 -o "${release_json}" \
+        "https://api.github.com/repos/${release_repo}/releases/tags/${release_tag}"
+    current_digest="$("${repo_root}/scripts/resolve-release-asset-digest.py" "${release_json}" kernel.zip)"
     if [ "${current_digest}" = "${actual_sha256}" ]; then
         echo "kernel.zip matches current release digest; continuing with updated kernel artifact" >&2
     else
