@@ -94,8 +94,8 @@ if [ -n "${deviceinfo_bootimg_prebuilt_dtb:-}" ]; then
     cp -f "${dtb_img}" "${port_tree}/${deviceinfo_bootimg_prebuilt_dtb}"
 fi
 
-# shellcheck source=scripts/git-clone-lib.sh
-source "${repo_root}/scripts/git-clone-lib.sh"
+# shellcheck source=scripts/build-helpers.sh
+source "${repo_root}/scripts/build-helpers.sh"
 
 download_verified() {
     local url="$1"

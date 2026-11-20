@@ -7,6 +7,8 @@ cd "${repo_root}"
 # Coordinated dependency versions and checksums.
 # shellcheck disable=SC1091
 source "${repo_root}/dependencies.lock"
+# shellcheck source=scripts/build-helpers.sh
+source "${repo_root}/scripts/build-helpers.sh"
 
 build_tools_repo="${BUILD_TOOLS_REPO:?BUILD_TOOLS_REPO is required}"
 build_tools_revision="${BUILD_TOOLS_REVISION:?BUILD_TOOLS_REVISION is required}"
@@ -90,25 +92,28 @@ for image in dtb.img dtbo.img system_dlkm.img vendor_dlkm.flatten.img vendor_ker
 done
 
 mkdir -p "${artifacts_dir}"
-for file in \
-    "${output_dir}/system.img" \
-    "${output_dir}/boot.img" \
-    "${output_dir}/init_boot.img" \
-    "${output_dir}/vendor_boot.img" \
-    "${output_dir}/vendor_kernel_boot.img" \
-    "${output_dir}/dtb.img" \
-    "${output_dir}/dtbo.img" \
-    "${output_dir}/system_dlkm.img" \
-    "${output_dir}/vendor_dlkm.flatten.img" \
-    "${output_dir}/device_husky.tar.xz" \
-    "${output_dir}/device_husky.tar.build" \
-    "${output_dir}/android-rootfs.img" \
-    "${ota_input_dir}/libhybris-16-update.tar.xz" \
-    "${ota_input_dir}/halium_halium_arm64-16.tar.xz" \
-    "${ota_dir}/ubuntu_command"; do
-    if [ -f "${file}" ]; then
-        cp -f "${file}" "${artifacts_dir}/"
-    fi
+release_artifacts=(
+    "${output_dir}/system.img"
+    "${output_dir}/boot.img"
+    "${output_dir}/init_boot.img"
+    "${output_dir}/vendor_boot.img"
+    "${output_dir}/vendor_kernel_boot.img"
+    "${output_dir}/dtb.img"
+    "${output_dir}/dtbo.img"
+    "${output_dir}/system_dlkm.img"
+    "${output_dir}/vendor_dlkm.flatten.img"
+    "${output_dir}/device_husky.tar.xz"
+    "${output_dir}/device_husky.tar.build"
+    "${output_dir}/android-rootfs.img"
+    "${ota_input_dir}/libhybris-16-update.tar.xz"
+    "${ota_input_dir}/halium_halium_arm64-16.tar.xz"
+    "${ota_dir}/ubuntu_command"
+)
+# A rolling release must carry the complete artifact set; fail with the
+# missing filename(s) instead of silently publishing a partial set.
+require_files "${release_artifacts[@]}"
+for file in "${release_artifacts[@]}"; do
+    cp -f "${file}" "${artifacts_dir}/"
 done
 
 (

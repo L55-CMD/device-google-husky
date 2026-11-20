@@ -1,4 +1,4 @@
-# Shared git helpers for the build scripts. Sourced, not executed.
+# Shared helpers for the build scripts. Sourced, not executed.
 #
 # shellcheck shell=bash
 
@@ -30,4 +30,22 @@ git_clone_if_missing() {
     fi
 
     git clone --depth 1 --branch "${branch}" "${url}" "${target}"
+}
+
+# require_files <file>...
+#
+# Every listed file must exist. A release missing ANY expected artifact
+# must fail the build with the missing filename(s) - silently shipping a
+# partial artifact set leads to partial-image flashes on the device.
+require_files() {
+    local missing=()
+    local f
+    for f in "$@"; do
+        [ -f "${f}" ] || missing+=("${f}")
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+        echo "Missing expected release artifacts:" >&2
+        printf '  %s\n' "${missing[@]}" >&2
+        return 1
+    fi
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for git_clone_if_missing (scripts/git-clone-lib.sh), used by
+# Tests for git_clone_if_missing (scripts/build-helpers.sh), used by
 # prepare-device-tarball.sh for the pinned tool clones (avb, mkbootimg,
 # halium_bootable_recovery).
 #
@@ -9,8 +9,8 @@
 set -euo pipefail
 
 repo_root="$(realpath "$(dirname "$0")/..")"
-# shellcheck source=scripts/git-clone-lib.sh
-source "${repo_root}/scripts/git-clone-lib.sh"
+# shellcheck source=scripts/build-helpers.sh
+source "${repo_root}/scripts/build-helpers.sh"
 
 command -v git >/dev/null 2>&1 || { echo "git missing"; exit 77; }
 
