@@ -92,7 +92,7 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-21T22:30Z
+2026-11-21T22:52Z
 
 - Canonical device branch: `test-audio-restore`. Phase 3 communications
   documentation was committed separately on `phase3-comms-docs` (@e73001d)
@@ -151,10 +151,15 @@ LTO_NONE fragment stays because it is part of the validated source tree.
 - Phone: integrated baseline (on-device known-good) running, healthy.
   Defect #7 audio stub work queued (husky-verify/audio-20261112/).
   Unlisted hardware remains UNTESTED.
-- Next discriminating actions, in priority order: (1) verify hardening
-  device CI run 44957022617 and deliberate-merge ONLY if the complete
-  normal/debug artifact sets are green; (2) reproduce/capture defect #12
-  Wi-Fi-after-suspend on the known-good baseline; (3) PM_AUTOSLEEP as a
-  separate on-device experiment; (4) then defect #10, defect #11, other
-  communications tests, VoLTE research, defect #7, and patch-stack
-  isolation as separately scoped work.
+- Hardening promotion COMPLETE: device CI run 44957022617 succeeded;
+  Agent 2 verified both complete normal/debug five-image sets, coordinated
+  revisions, kernel provenance, and 209-module kver consistency. Canonical
+  main was deliberately fast-forwarded to device `24d9591`, manifest
+  `dd6cdda`, with patches main already at `22c33ed`. The main-push CI run
+  44958836687 was in progress at this update; the merged tree is exactly
+  the green hardening commit.
+- Next discriminating actions, in priority order: (1) reproduce/capture
+  defect #12 Wi-Fi-after-suspend on the known-good baseline; (2)
+  PM_AUTOSLEEP as a separate on-device experiment; (3) then defect #10,
+  defect #11, other communications tests, VoLTE research, defect #7, and
+  patch-stack isolation as separately scoped work.

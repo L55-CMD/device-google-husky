@@ -616,3 +616,45 @@ manifest. Per the runbook decision matrix, the failure is currently
 rarer than 1/6 cold-offs; keep the capture unit enabled and leave
 defect #8 OPEN as an intermittent low-reproduction startup race until
 new evidence identifies the trigger.
+
+
+## 2026-11-21 — Full hardening CI green; canonical main promoted
+
+Defect #8 released the phone after six valid controlled cold-off rounds,
+so the no-change-kernel hardening CI route was dispatched as run
+**44957022617**. Result: SUCCESS (preflight plus both matrix jobs,
+normal and debug).
+
+Offline artifact gate (Agent 2, evidence under
+`husky-verify/tmp/a2-harden/`):
+
+- Both `latest-harden-build-release-{normal,debug}` release sets include
+  the complete five boot images (`boot`, `init_boot`, `vendor_boot`,
+  `vendor_kernel_boot`, `dtbo`) plus split `super.img`, Android rootfs,
+  `SHA256SUMS`, and `MANIFEST.txt`; release digests and local downloads
+  match.
+- Coordinated revisions match the three branch tips: device
+  `24d9591771141174691acc4f3a341b896e15bc96`, manifest
+  `dd6cdda6096b47ba28a4c9bcdb9816b4d1b94598`, patches
+  `22c33ed85ad235fdc2bc09d4ef1a89379f5a207f`.
+- Kernel provenance: boot-embedded Image in both device variants is
+  byte-identical to the `harden-build-release` kernel-release Image,
+  kver `6.1.145-android14-11-gfb8153ed82aa`; vendor_kernel_boot has the
+  full 209-module tree and matching kver. Kernel release digest:
+  `a2b18e86091ab791480b9fcea1f8bce46ad46db5a22d0c29b46bf12efe0a9d39`.
+- Boot-images.zip hashes: normal `73741770…544a8d`, debug
+  `c63d771f…0f8739` (full records in Agent 2 evidence/report).
+
+Canonical promotion was deliberately limited to the exact green CI
+commit: device `main` fast-forwarded `107090e..24d9591`; manifest `main`
+fast-forwarded `a979a7a..dd6cdda`; patches `main` already equaled
+`22c33ed`. The push to device `main` started CI run 44958836687 on the
+same tree as the verified green commit.
+
+Caution retained for follow-up: the shipped hardening kernel's embedded
+IKCONFIG confirms `CONFIG_LTO_CLANG_THIN=y`, `# CONFIG_LTO_NONE is not
+set`, `# CONFIG_CFI_PERMISSIVE is not set`, and `# CONFIG_PM_AUTOSLEEP
+is not set`. This matches the current on-device known-good baseline
+config but contradicts the historical `CONFIG_LTO_NONE` claim attached
+to patch `22c33ed`; correct/revalidate that claim separately. It does
+not invalidate the green hardening artifact gate.
