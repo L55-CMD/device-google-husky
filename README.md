@@ -32,7 +32,7 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 | UI clock widget | Does not update despite correct system clock |
 | Sensors / vibration | Not validated |
 | Camera/video acceleration | Working on integrated baseline (defect #6 closed 2026-11-20; MFC bound via samsung_iommu_v9 + pKVM ramdisk segment) |
-| Suspend/resume / shutdown | Clean poweroff passes (2026-11-20); suspend under Phase 2 testing; Wi-Fi-after-suspend broken (defect #12); intermittent cold-boot Lomiri crash-loop is a separate failure (defect #8) |
+| Suspend/resume / shutdown | Clean poweroff passes (2026-11-20); suspend under Phase 2 testing; Wi-Fi-after-suspend broken (defect #12); intermittent cold-boot Lomiri crash-loop remains a separate low-reproduction failure (defect #8; 0/6 on 2026-11-21 controlled cold-offs) |
 | USB-C DisplayPort | Not validated |
 | Recovery/offline charging | Not validated |
 

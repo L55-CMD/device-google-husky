@@ -592,3 +592,27 @@ succeeds but the module is NOT in the host /lib/modules/<kver> tree
 (loaded from the vendor image at boot), so it cannot be reloaded —
 Wi-Fi stays dead until reboot. Do NOT unload bcmdhd4398 again or use
 driver reload as a recovery handle.
+
+
+## 2026-11-21 — Defect #8 controlled cold-off series: 6/6 GOOD, no reproduction
+
+On-device image remained the integrated known-good baseline (kver
+`6.1.145-android14-11-g799ecb77416a`, slot `_b`). The defect-#8 capture
+unit was installed and enabled; each valid round used
+`systemctl poweroff --no-block`, waited for RNDIS drop, cold-soaked for
+60 seconds, then powered on and polled for SSH. Per-boot evidence was
+captured under `/userdata/defect8-capture/<timestamp>-boot/`.
+
+An initial round-1 attempt was invalid: the phone entered the bootloader
+instead of Ubuntu and created no boot capture. It was excluded from the
+defect verdict. The subsequent six valid rounds all reached SSH and were
+classified by the capture unit as `healthy-stable`; LightDM was active
+with `NRestarts=0` in every capture.
+
+Valid result: **0/6 reproduction** (defect #8 did not recur). Host
+archive: `husky-verify/defect8-capture/evidence-20261121/` with
+`SERIES-LOG.md`, per-round captures, and a verified `SHA256SUMS`
+manifest. Per the runbook decision matrix, the failure is currently
+rarer than 1/6 cold-offs; keep the capture unit enabled and leave
+defect #8 OPEN as an intermittent low-reproduction startup race until
+new evidence identifies the trigger.
