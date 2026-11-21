@@ -94,7 +94,8 @@ LTO_NONE fragment stays because it is part of the validated source tree.
 ## Current state
 2026-11-21T23:58Z
 
-- Canonical device docs branch: `test-audio-restore` @ `3732ff5` (pushed).
+- Canonical device docs branch: `test-audio-restore` @ `9fb3bc1` (pushed; this
+  commit records the rollback and CI precondition).
   Canonical device integration branch `main`: `24d9591`; manifest `main`:
   `dd6cdda`; patches `main`: `22c33ed`. Hardening CI `44957022617` and
   main-push CI `44958836687` succeeded; Agent 2 verified both complete
