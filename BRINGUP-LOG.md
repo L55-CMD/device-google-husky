@@ -658,3 +658,54 @@ is not set`. This matches the current on-device known-good baseline
 config but contradicts the historical `CONFIG_LTO_NONE` claim attached
 to patch `22c33ed`; correct/revalidate that claim separately. It does
 not invalidate the green hardening artifact gate.
+
+
+## 2026-11-21 — Defect #12 reproduced on known-good baseline; failed state captured
+
+After the hardening promotion and defect-#8 series, the known-good
+baseline (kver `g799ecb77416a`, same boot) was used for a controlled
+Wi-Fi-after-suspend reproduction. Evidence root:
+`husky-verify/defect12-evidence-20261121/` (SERIES-LOG plus verified
+SHA256SUMS).
+
+Suspend attempts:
+
+- `systemctl suspend --no-block` at 22:55:28Z did not enter suspend;
+  `systemd-sleep` reported `Device or resource busy`, and PM showed the
+  bcmdhd4398 PCI suspend callback failing with `-16` on deep/s2idle.
+- Two rtcwake deep-suspend attempts (22:59:08Z and 23:00:45Z) entered
+  suspend but resumed immediately on `bt_host_wake`; Wi-Fi remained
+  data-working afterward.
+- Temporarily disabling the BT platform wake source produced a failed
+  suspend attempt (`bcmdhd4398 ... error -16`), then the setting was
+  restored.
+- Temporarily soft-blocking Bluetooth allowed a real ~23-second deep
+  suspend/resume cycle (23:05:59Z→23:06:22Z, wake via `s2mpg14-irq`);
+  Wi-Fi still worked immediately afterward. Bluetooth was restored.
+- A later 60-second rtcwake attempt at 23:07:20Z failed immediately in
+  the bcmdhd4398 suspend path with `failed to suspend async: error -1`.
+
+Failed state captured before reboot:
+
+- By 23:10:56Z, wlan0/wlan1 remained UP with IP addresses, `iw dev`
+  still reported AP association, and NetworkManager reported
+  `connected/full`.
+- In reality the data plane was dead: phone-side pings to the AP and
+  host failed at 100%; host-side pings to both Wi-Fi addresses failed
+  and ARP remained unresolved.
+- Kernel logs repeatedly reported `wl_cfg80211_dump_station :
+  WLC_GET_ASSOCLIST error -19` and `wl_check_assoc_state : failed to
+  get assoc_info : err=-19`.
+- Full `journalctl -b` and `dmesg` were captured in the failed state,
+  along with rfkill/NM/interface/host probes. The phone stayed on boot
+  `21151961-f92d-47b2-aead-fab7c83fb540`; no reboot or driver reload
+  was performed.
+
+Current interpretation: defect #12 is a bcmdhd4398 suspend-path failure
+mode, not merely an rfkill/UI state issue. A successful deep
+suspend/resume followed by a failed suspend attempt that aborts in
+`dhdpcie_pm_suspend` can leave the driver internally inconsistent
+(association reported, ENODEV internally, no traffic). Keep #12 OPEN;
+do not unload bcmdhd4398. PM_AUTOSLEEP is the next separate experiment;
+flashing/rebooting for it will intentionally destroy this live failed
+state after the evidence capture above.

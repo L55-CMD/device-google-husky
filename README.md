@@ -14,7 +14,7 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 | Graphics/composer | Mali and composer3 initialize; panel handover works; `--enable-num-framebuffers-quirk=true` required for tear-free interaction |
 | Mobile data | Working |
 | System clock/NTP | Working |
-| Wi-Fi | **Partial** — ordinary Wi-Fi working (validated 2026-11-10: joins WPA2 LAN, sustained SSH over Wi-Fi); Wi-Fi does not survive suspend/resume (defect #12, bcmdhd4398/rfkill/supplicant) |
+| Wi-Fi | **Partial** — ordinary Wi-Fi working; suspend/resume reproduced a broken data plane on 2026-11-21 (interfaces stay UP/associated but pass no traffic; bcmdhd4398 ENODEV after suspend-path failure, defect #12) |
 | SSH access | Working on debug images via bring-up key (RNDIS `10.15.19.82`, also Wi-Fi); normal images are key-only and must not expose rescue mode |
 | Calls | Connects; bidirectional call audio not working (defect #2) |
 | SMS | **Working on the current installation** (2026-11-20: receive + send via messaging app after a 0-byte history DB was removed; that is a recovery workaround, not a durable fix — first-boot DB initialization remains open under defect #9) |

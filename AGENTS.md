@@ -92,7 +92,7 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-21T22:52Z
+2026-11-21T23:15Z
 
 - Canonical device branch: `test-audio-restore`. Phase 3 communications
   documentation was committed separately on `phase3-comms-docs` (@e73001d)
@@ -130,14 +130,15 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   mechanisms work, Lomiri indicator actions are defect #10. Bluetooth
   media/A2DP/reconnect/suspend survival pass; call audio untested. NFC
   is defect #11 (AIDL-capable nfcd plugin needed). VoLTE is research only.
-- Defect #12 NEW: Wi-Fi does not survive suspend/resume (wlan link down,
-  rfkill soft block, supplicant initialization timeout; driver bcmdhd4398).
-  Phase 2 owns it with Phase 3 context. Before a fix, inspect
-  NetworkManager, rfkill/urfkill, wpa_supplicant, interface state, and
-  bcmdhd4398 resume logs. Capture the failed-state journal, `ip link`,
-  `rfkill list`, `nmcli radio/device/general`, and `iw dev` BEFORE any
-  reboot. NEVER unload bcmdhd4398 — it is vendor-image-loaded and not
-  reloadable from the host module tree.
+- Defect #12 REPRODUCED 2026-11-21 on the known-good baseline: after a
+  controlled deep suspend/resume followed by a failed suspend attempt in
+  `dhdpcie_pm_suspend`, wlan0/wlan1 remained UP/associated and NM claimed
+  connected/full, but both phone-side and host-side traffic failed. Driver
+  logs repeat `WLC_GET_ASSOCLIST error -19` / `failed to get assoc_info:
+  err=-19`. Full failed-state journal + dmesg were captured before reboot:
+  husky-verify/defect12-evidence-20261121/ (verified SHA256SUMS). Phone was
+  intentionally left in the failed state for inspection; PM_AUTOSLEEP
+  flashing/reboot will destroy it. NEVER unload bcmdhd4398.
 - CLEAN-INSTALL CHECK: after the next clean flash, verify
   `~/.local/share/history-service/history.sqlite` is non-zero and has the
   expected schema before applying any SMS workaround; if it is 0-byte,
@@ -158,8 +159,9 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   `dd6cdda`, with patches main already at `22c33ed`. The main-push CI run
   44958836687 was in progress at this update; the merged tree is exactly
   the green hardening commit.
-- Next discriminating actions, in priority order: (1) reproduce/capture
-  defect #12 Wi-Fi-after-suspend on the known-good baseline; (2)
-  PM_AUTOSLEEP as a separate on-device experiment; (3) then defect #10,
-  defect #11, other communications tests, VoLTE research, defect #7, and
-  patch-stack isolation as separately scoped work.
+- Next discriminating actions, in priority order: (1) run PM_AUTOSLEEP as
+  a separate on-device experiment (first /sys/power/autosleep + repowerd
+  path; stop/collect logs if fallback persists; only then manual resume,
+  automatic suspend, and incoming-call wake separately); (2) then defect
+  #10, defect #11, other communications tests, VoLTE research, defect #7,
+  and patch-stack isolation as separately scoped work.
