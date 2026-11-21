@@ -92,7 +92,7 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-21T23:15Z
+2026-11-21T23:42Z
 
 - Canonical device branch: `test-audio-restore`. Phase 3 communications
   documentation was committed separately on `phase3-comms-docs` (@e73001d)
@@ -159,9 +159,19 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   `dd6cdda`, with patches main already at `22c33ed`. The main-push CI run
   44958836687 was in progress at this update; the merged tree is exactly
   the green hardening commit.
-- Next discriminating actions, in priority order: (1) run PM_AUTOSLEEP as
-  a separate on-device experiment (first /sys/power/autosleep + repowerd
-  path; stop/collect logs if fallback persists; only then manual resume,
-  automatic suspend, and incoming-call wake separately); (2) then defect
-  #10, defect #11, other communications tests, VoLTE research, defect #7,
+- PM_AUTOSLEEP experiment STOPPED after evidence capture: CI run
+  44960937874 green; matched debug boot set flashed (kver gc5e9bc394477).
+  `/sys/power/autosleep` exists and repowerd successfully selected the
+  Libsuspend path (no fallback log; it changed autosleep to `mem`).
+  However, both manual and automatic suspend failed to enter suspend:
+  bcmdhd4398 reported internal wakelock/busy state (`dhdpcie_bus_suspend:
+  Suspend failed because of wakelock`, `dhd_bus_busy_state: 0x44`).
+  Autosleep was set back to `off`; evidence:
+  husky-verify/pm-autosleep-20261121/ (verified SHA256SUMS). Do not run
+  incoming-call wake until suspend-entry is reliable. Phone remains on the
+  PM test image pending a deliberate rollback/investigation decision.
+- Next discriminating actions, in priority order: (1) decide whether to
+  roll back to the known-good baseline or isolate the bcmdhd4398 suspend
+  wakelock as its own experiment; (2) only then schedule defect #10,
+  defect #11, remaining communications tests, VoLTE research, defect #7,
   and patch-stack isolation as separately scoped work.

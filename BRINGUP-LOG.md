@@ -709,3 +709,47 @@ suspend/resume followed by a failed suspend attempt that aborts in
 do not unload bcmdhd4398. PM_AUTOSLEEP is the next separate experiment;
 flashing/rebooting for it will intentionally destroy this live failed
 state after the evidence capture above.
+
+
+## 2026-11-21 — PM_AUTOSLEEP image: repowerd path fixed, suspend entry blocked by bcmdhd4398
+
+Device CI run **44960937874** for `test-pm-autosleep` succeeded. The debug
+release was digest/preflight verified and only the complete matched
+five-image boot set was flashed to slot b (no super/userdata changes).
+Preflight: PM kernel kver `6.1.145-android14-11-gc5e9bc394477`, flat
+25-module pKVM closure in init_boot, full 209-module
+vendor_kernel_boot tree. Evidence:
+`husky-verify/pm-autosleep-20261121/`.
+
+First-boot result:
+
+- `/sys/power/autosleep` EXISTS; `/proc/config.gz` confirms
+  `CONFIG_PM_AUTOSLEEP=y` and `CONFIG_PM_WAKELOCKS=y`.
+- repowerd 2025.01 starts without the prior deterministic
+  `Failed to create LibsuspendSystemPowerControl` message and changes
+  autosleep from `off` to `mem`, so the intended repowerd/libsuspend
+  path is selected.
+- Quick pKVM chain spot-check showed `pkvm_s2mpu_v9`,
+  `samsung_iommu_v9` (21 refs), and Mali loaded; no panic/fault signature
+  in the quick scan.
+
+Suspend-entry result:
+
+- Manual `systemctl suspend --no-block` at 23:35:51Z did not enter
+  suspend; RNDIS stayed up and systemd-sleep returned `Device or resource
+  busy`.
+- With autosleep=`mem`, automatic suspend attempts also failed repeatedly
+  (examples at 23:37:12Z, 23:38:00Z, 23:39:30Z).
+- Kernel evidence: `dhd_net_bus_suspend: wait to clear dhd_bus_busy_state:
+  0x44` and repeated `dhdpcie_bus_suspend(): Suspend failed because of
+  wakelock restoring Dongle to D0`. System `/sys/power/wake_lock` was
+  empty; this is an internal bcmdhd4398 busy/wakelock state.
+- Full journal/dmesg captured, then `/sys/power/autosleep` was set back
+  to `off` to stop repeated failed attempts.
+
+Verdict: the PM_AUTOSLEEP kernel change fixes the repowerd/libsuspend
+configuration problem but is NOT a validated suspend fix because actual
+system suspend is blocked by bcmdhd4398. Do not test incoming-call wake
+on top of this; it would conflate wake behavior with suspend-entry
+failure. The phone remains on the PM test image pending a deliberate
+rollback or a separately scoped bcmdhd4398 wakelock investigation.
