@@ -463,3 +463,132 @@ husky-verify/defect8-capture/ (not yet run; awaits user go).
 
 **Phone state:** integrated baseline running, healthy (Lomiri greeter,
 container, RNDIS/SSH). This is the on-device known-good build.
+
+
+## 2026-11-20 — Phase 3 (communications) test session on the integrated baseline
+
+Tested on the CI 44612802506 debug set already on the phone (no new
+flash). Full evidence + probe scripts: bring-up host
+`husky-verify/comms-20261120/` (NOTES.md is the session log;
+probe-comms.sh, messaging-app-debug.sh, bt-pair-test.sh).
+
+### Defect #9 — messaging-app crash — recovery applied; first-boot DB initialization root cause OPEN
+
+Symptom: messaging app crashed on open and when tapping SMS
+notifications (SMS itself reached ofono fine — `incoming sms` log
+lines at 19:09Z). Root cause: `lomiri-history-daemon` never created
+its database — `~/.local/share/history-service/history.sqlite` was a
+0-byte file from first boot (Nov 10 18:14); the daemon logged
+`Failed to create or update the database` on every boot and every
+query failed with `no such table: threads`. The messaging app crashes
+because its history backend is an empty schema.
+Recovery (TESTED, NOT A DURABLE FIX): back up + remove the 0-byte
+DB, restart `lomiri-history-daemon.service` (user scope) → proper 53
+KB schema created, queued SMS imported, messaging app fully working
+on the current installation (user confirmed send/receive). Root cause
+of the original first-boot creation failure is UNKNOWN (first-boot
+race suspected) and remains OPEN: reproduce from a clean flash or fix
+the initialization path in code. WATCH ITEM: may recur on clean
+flashes; check for a 0-byte history.sqlite first if messaging breaks
+again. Cosmetic: history-daemon complains "The phone number is
+not a valid number: Vodafone" for carrier alphanumeric senders —
+messages still save.
+
+### Communications results (all on-device TESTED unless marked)
+
+- SMS: receive + send WORKING ON THE CURRENT INSTALLATION (via ofono
+  1.29 + telepathy-ofono; messaging-app layer needed the defect #9
+  recovery workaround). The first-boot DB-initialization failure is not
+  closed.
+- MMS: RECEIVE/DISPLAY WORKING — picture message received + displayed
+  (nuntium dbus-activated; Vodafone MMS APN + proxy + MMSC provisioned
+  in ofono context2). MMS SENDING REMAINS UNTESTED.
+- Carrier/signal reporting: WORKING (operator "vodafone UK",
+  MCC/MNC, CellId, LTE tech, registration state). ofono Strength read
+  3/100 indoors (~-112 dBm per husky.conf range) while data worked —
+  likely genuine weak coverage; UI-bar cross-check pending.
+- VoLTE: NOT WORKING. IMS (IpMultimediaSystem) present but
+  Registered=false, Voice/SmsCapable=false; Register() →
+  org.ofono.Error.Failed. IMS APN (context3, "ims") provisioned but
+  inactive. Container has rild_exynos (Samsung SIT RIL V2.3) + no
+  vendor ims daemon; carrier_id=28, default_network=27. Pixels
+  generally need Google IMS (GMS) for VoLTE — this GSI has no GMS.
+  RESEARCH ITEM, not a simple ofono fix. Voice calls work via the
+  legacy CS path meanwhile.
+- Airplane mode: PARTIAL/defect. System level WORKS (NM rfkill as
+  root kills Wi-Fi; ofono Online=false/true cycles the modem with
+  clean LTE re-registration + data restore in ~10 s). Lomiri
+  indicator flight-mode toggle is a NO-OP. urfkilld exposes only two
+  Ofono-type devices (name "unknown unknown", platform=false) and NO
+  wlan/bt killswitches, though kernel rfkill devices exist and work.
+  Defect #10. Next step (own session): restart urfkilld, re-enumerate.
+- Mobile hotspot: PARTIAL/defect. System level WORKS: NM AP mode
+  (nmcli-created "phase3-hotspot" on wlan1) beacons (iw: type AP,
+  ch 11), NM shared mode + dnsmasq DHCP up, phone side 10.42.0.1/24,
+  iptables/NAT functional (CONFIG_IP_NF_* built-in; the modprobe
+  FATAL lines at hotspot start are benign). AP survived a suspend
+  cycle. Lomiri indicator hotspot creation FAILS ("Hotspot network
+  creation took too long", NM log 20:40Z — the indicator also
+  deactivated the test AP at 20:39Z). Client join E2E untested (user
+  test device flaky at scanning). Treat this as part of defect #10's
+  indicator/UI plumbing, not as a fully working hotspot.
+- Bluetooth: MEDIA PATH WORKING. MOMENTUM TW 4 earbuds: pair/trust/
+  connect PASS; PA bluez A2DP sink registered (module-bluez5-
+  discover); 2 s test tone audible in earbuds (user confirmed);
+  disconnect → re-open case → auto-reconnect within 5 s, sink
+  reappears. BT call audio/mic UNTESTED — blocked by defect #2.
+  Pairing state survived suspend.
+- NFC: NOT WORKING, root cause IDENTIFIED. Kernel modules fine (nfc,
+  st21nfc, st54spi; /dev/st21nfc), container AIDL HAL
+  (android.hardware.nfc-service.st) running, but nfcd 1.2.1
+  (ubports) registers ZERO adapters — its binder plugin is
+  HIDL-only (strings show only `android.hardware.nfc@1.0::INfc` on
+  /dev/hwbinder) while the device ships an AIDL-only NFC HAL. Defect
+  #11. Fix direction: rebuild nfcd-binder-plugin with AIDL support
+  (upstream mer-hybris has it) — a package build, own session.
+- SIM PIN unlock / dual-SIM: UNTESTED (user opted out; SIM has no
+  PIN; slot2 empty but correctly enumerated as absent by ofono
+  binder).
+
+### Notes for other phases
+
+- The ofono 1.29 fork does NOT implement freedesktop
+  Properties.GetAll — use per-interface `GetProperties` methods.
+- root@ SSH (same key) sees the full journal and `lxc-attach -n
+  android -- getprop/ps`.
+- FOLLOW-UP PRIORITY: (1) let Phase 1 finish the defect #8 capture
+  series; (2) hand the defect #12 Wi-Fi-after-suspend evidence to
+  Phase 2; (3) handle defect #10 indicator/UI plumbing as its own
+  change; (4) handle defect #11 NFC AIDL plugin support as its own
+  change; (5) keep VoLTE as a separate research item — do not combine
+  IMS experimentation with the current stability work.
+- CLEAN-INSTALL TEST PLAN: after the next clean flash, check
+  `~/.local/share/history-service/history.sqlite` before applying any
+  workaround. It must be non-zero and contain the expected schema;
+  if it is 0-byte, capture the first-boot journal plus
+  `lomiri-history-daemon.service` logs before recovery so defect #9's
+  root cause can be reproduced or fixed at the source.
+- Session interrupted by Phase 1/2 suspend-reboot cycles 3 times —
+  wait-for-phone.sh reconnect handles it; comms state survived.
+
+### Defect #12 — Wi-Fi-after-suspend (Phase 2 overlap, observed during Phase 3)
+After the ~20:56Z suspend cycle both wlan0/wlan1 were link-DOWN with
+rfkill soft-blocked; the indicator oscillated "Setting WiFi enabled
+= false/true" ~1/s on resume. rfkill unblock, `nmcli radio wifi
+off/on`, and a full NetworkManager restart did NOT recover
+("Couldn't initialize supplicant interface: Timeout was reached");
+only a reboot healed it. Also seen at 18:48 boot ("wpa_supplicant
+couldn't grab this interface" on wlan0). Driver: bcmdhd4398. This
+blocks resume reliability — Phase 2 should pick it up.
+Defect #12 evidence handoff: Phase 2 owns investigation/fix; Phase 3
+records the communications-context symptoms above. Before attempting a
+fix, inspect NetworkManager state, rfkill/urfkill state, wpa_supplicant
+logs, wlan interface state, and bcmdhd4398 suspend/resume journal
+entries.
+WARNING: capture the complete failed-state journal plus `ip link`,
+`rfkill list`, `nmcli radio/device/general`, `iw dev`, and relevant
+wpa_supplicant/bcmdhd4398 logs BEFORE rebooting. `rmmod bcmdhd4398`
+succeeds but the module is NOT in the host /lib/modules/<kver> tree
+(loaded from the vendor image at boot), so it cannot be reloaded —
+Wi-Fi stays dead until reboot. Do NOT unload bcmdhd4398 again or use
+driver reload as a recovery handle.

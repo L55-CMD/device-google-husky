@@ -6,7 +6,7 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 
 | Area | Status |
 |---|---|
-| Boot to Lomiri | Working, with a bottom-region scanout artifact |
+| Boot to Lomiri | Working |
 | Boot/reboot stability | Working (many deliberate reboots and session restarts during bring-up) |
 | Touch | Working, including edge gestures and app drawer |
 | Terminal app / Morph browser | Working (used for on-device setup and downloads) |
@@ -14,21 +14,29 @@ This repository contains an in-progress Ubuntu Touch port for the Pixel 8 Pro (T
 | Graphics/composer | Mali and composer3 initialize; panel handover works; `--enable-num-framebuffers-quirk=true` required for tear-free interaction |
 | Mobile data | Working |
 | System clock/NTP | Working |
-| Wi-Fi | Working (validated 2026-11-10: joins WPA2 LAN, sustained SSH over Wi-Fi) |
-| Bluetooth | Not validated |
+| Wi-Fi | **Partial** — ordinary Wi-Fi working (validated 2026-11-10: joins WPA2 LAN, sustained SSH over Wi-Fi); Wi-Fi does not survive suspend/resume (defect #12, bcmdhd4398/rfkill/supplicant) |
 | SSH access | Working on debug images via bring-up key (RNDIS `10.15.19.82`, also Wi-Fi); normal images are key-only and must not expose rescue mode |
-| Calls | Connects; bidirectional call audio not working |
-| SMS | Permission flow needs retest on cleaned image (trust-store fix is now in-image) |
+| Calls | Connects; bidirectional call audio not working (defect #2) |
+| SMS | **Working on the current installation** (2026-11-20: receive + send via messaging app after a 0-byte history DB was removed; that is a recovery workaround, not a durable fix — first-boot DB initialization remains open under defect #9) |
+| MMS | **Partial** — picture-message receive/display tested (2026-11-20; nuntium + Vodafone MMS APN provisioned); MMS send remains untested |
+| Carrier/signal reporting | Working (operator name, MCC/MNC, CellId, LTE registration all report via ofono) |
+| VoLTE | **Not working** (IMS unregistered, `IpMultimediaSystem.Register` fails; likely needs Google IMS/GMS or vendor IMS stack — research item) |
+| SIM PIN unlock | Untested (SIM has no PIN set) |
+| Dual-SIM | Untested (single SIM present; slot2 correctly reports absent) |
+| Airplane mode | **Partial** — system-level radio control works (NM rfkill + ofono Online); Lomiri indicator flight-mode toggle is a no-op (defect #10, urfkilld exposes no wlan/bt killswitches) |
+| Mobile hotspot | **Partial** — AP beacons, dnsmasq, and NAT verified at system level; Lomiri indicator hotspot creation fails ("Hotspot network creation took too long"); client join untested, so not a fully working hotspot |
+| Bluetooth | **Media path working** (2026-11-20: pair, trust, A2DP audio playback, auto-reconnect, and suspend survival PASS with earbuds); BT call audio/mic untested (blocked by defect #2) |
+| NFC | **Not working** — nfcd runs but registers zero adapters; device's NFC HAL is AIDL-only while the ubports nfcd 1.2.1 binder plugin is HIDL-only (defect #11, fix = AIDL-capable plugin build) |
+| Audio playback/microphone | Pulse devices exist; media playback works (YouTube); call routing incomplete (defect #2/#7) |
 | Camera app | Permission/trust-store startup fixed in image; capture untested |
 | UI clock widget | Does not update despite correct system clock |
-| Audio playback/microphone | Pulse devices exist; call routing incomplete |
 | Sensors / vibration | Not validated |
-| Camera/video acceleration | Blocked by exynos MFC IOMMU fault; node masked |
-| Suspend/resume / shutdown | Not validated (reboots are stable; suspend untested) |
+| Camera/video acceleration | Working on integrated baseline (defect #6 closed 2026-11-20; MFC bound via samsung_iommu_v9 + pKVM ramdisk segment) |
+| Suspend/resume / shutdown | Clean poweroff passes (2026-11-20); suspend under Phase 2 testing; Wi-Fi-after-suspend broken (defect #12); intermittent cold-boot Lomiri crash-loop is a separate failure (defect #8) |
 | USB-C DisplayPort | Not validated |
 | Recovery/offline charging | Not validated |
 
-The bottom screen defect appears to mirror fragmented content from the top of the panel. A full Lomiri flag matrix (framebuffer-count quirk × overlay disable, four combinations) showed the artifact is **independent of both compositor flags** — investigation now focuses on the DSC-compressed DSI stream and panel scanout, not UI scaling. Defaults remain quirk on + overlays off per the matrix findings. Evidence: bring-up host `flag-tests/` bundle (see `docs/HANDOVER.md` §5).
+The bottom-region scanout artifact is **GONE on the current integrated baseline** (2026-11-19/20, user-verified; mechanism UNKNOWN). The Lomiri flag matrix / force60 / wqhd investigation queue is MOOT — do not rerun unless the artifact regresses.
 
 ## Release layout
 
