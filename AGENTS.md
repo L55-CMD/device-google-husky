@@ -92,8 +92,12 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-20T19:15Z
+2026-11-21T20:01Z
 
+- Canonical device branch: `test-audio-restore`. Phase 3 communications
+  documentation was committed separately on `phase3-comms-docs` (@e73001d)
+  and fast-forwarded here; `harden-build-release` is reserved for
+  build/release hardening only.
 - ON-DEVICE KNOWN-GOOD BASELINE (TESTED 2026-11-20): integrated family
   kernel-patches-husky 22c33ed / manifest a979a7a / device test-audio-
   restore (build code ca7a9ea; docs through 660bfb3+), coordinated tag
@@ -110,19 +114,36 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   kernel.zip as release `main`). PENDING: FF device `main` to this
   branch's head once the manifest `main` kernel.zip exists (FF-verified,
   old main 107090e is an ancestor). Details: BRINGUP-LOG 2026-11-20.
-- RUN-98 (superseded by the integrated baseline, RETAINED as fallback):
-  kver gc9a0580a0791, same on-device verdicts (boots past 13.9s, pkvm
-  chain bound, YouTube working, defect #1 artifact gone). Artifacts:
-  husky-flash/ltonone-ci/, evidence husky-verify/tmp/ltonone-full-
-  20261119-105157/. Effective config CONFIG_LTO_CLANG_THIN=y (CORRECTION
-  above applies to both).
 - Defect #1 bottom-screen artifact: RESOLVED on this baseline (mechanism
-  UNKNOWN; force60/wqhd queue MOOT). Defect #8 OPEN (intermittent):
-  first boot after cold poweroff may crash-loop Lomiri (~65s lightdm
-  restart cycle, black screen, no host RNDIS); identical later boot
-  healthy → startup race. GOTCHA: with Lomiri down, a short power press
-  powers the phone OFF via logind. Capture procedure: husky-verify/
-  defect8-capture/ (prepared, NOT started).
+  UNKNOWN; force60/wqhd queue MOOT). RUN-98 is superseded but retained as
+  fallback; both effective kernels use CONFIG_LTO_CLANG_THIN=y.
+- Defect #8 OPEN (intermittent): first boot after cold poweroff may
+  crash-loop Lomiri (~65s lightdm restart cycle, black screen, no host
+  RNDIS); identical later boot healthy → startup race. GOTCHA: with
+  Lomiri down, a short power press powers the phone OFF via logind.
+  Capture procedure: husky-verify/defect8-capture/ (prepared, NOT
+  started; awaits user go). Finish this series before other stability
+  work.
+- Phase 3 communications state (BRINGUP-LOG 2026-11-20, evidence
+  husky-verify/comms-20261120/): SMS works on the CURRENT INSTALLATION
+  only after the 0-byte history.sqlite recovery; defect #9's first-boot
+  DB-initialization root cause remains OPEN. MMS receive/display tested;
+  MMS send untested. Airplane mode and hotspot are PARTIAL: low-level/NM
+  mechanisms work, Lomiri indicator actions are defect #10. Bluetooth
+  media/A2DP/reconnect/suspend survival pass; call audio untested. NFC
+  is defect #11 (AIDL-capable nfcd plugin needed). VoLTE is research only.
+- Defect #12 NEW: Wi-Fi does not survive suspend/resume (wlan link down,
+  rfkill soft block, supplicant initialization timeout; driver bcmdhd4398).
+  Phase 2 owns it with Phase 3 context. Before a fix, inspect
+  NetworkManager, rfkill/urfkill, wpa_supplicant, interface state, and
+  bcmdhd4398 resume logs. Capture the failed-state journal, `ip link`,
+  `rfkill list`, `nmcli radio/device/general`, and `iw dev` BEFORE any
+  reboot. NEVER unload bcmdhd4398 — it is vendor-image-loaded and not
+  reloadable from the host module tree.
+- CLEAN-INSTALL CHECK: after the next clean flash, verify
+  `~/.local/share/history-service/history.sqlite` is non-zero and has the
+  expected schema before applying any SMS workaround; if it is 0-byte,
+  capture first-boot journal + lomiri-history-daemon logs first.
 - 2026-11-18 bootloop root cause (SOLVED, separate): incomplete flash —
   stale vendor_kernel_boot_b. Guard: husky-verify/preflight-boot-images.sh
   (wired into flash scripts; BRINGUP.md warns). Flash over root SSH via
@@ -132,8 +153,9 @@ LTO_NONE fragment stays because it is part of the validated source tree.
 - Phone: integrated baseline (on-device known-good) running, healthy.
   Defect #7 audio stub work queued (husky-verify/audio-20261112/).
   Unlisted hardware remains UNTESTED.
-- Next discriminating actions: (1) finish device-main promotion once the
-  manifest `main` kernel.zip exists (mechanical, FF); (2) defect #8
-  capture series (awaits user go); (3) isolate the beneficial patch-stack
-  delta (bisect halium-husky vs test-r8-lazylink lineage) — OWN
-  EXPERIMENT, do not bundle; (4) then defect #7.
+- Next discriminating actions, in priority order: (1) finish defect #8
+  capture; (2) Phase 2 investigates defect #12; (3) defect #10 indicator
+  plumbing as a separate change; (4) defect #11 NFC AIDL support as a
+  separate change; (5) VoLTE research only, never combined with current
+  stability work; (6) then defect #7 / the beneficial patch-stack
+  isolation as separately scoped work.
