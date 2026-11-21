@@ -753,3 +753,35 @@ system suspend is blocked by bcmdhd4398. Do not test incoming-call wake
 on top of this; it would conflate wake behavior with suspend-entry
 failure. The phone remains on the PM test image pending a deliberate
 rollback or a separately scoped bcmdhd4398 wakelock investigation.
+
+
+## 2026-11-21 — Approved rollback to known-good baseline completed
+
+After the PM_AUTOSLEEP suspend-entry blocker was captured, the preserved
+known-good matched debug boot set was flashed back to slot b with explicit
+user approval. Only `boot_b`, `init_boot_b`, `vendor_kernel_boot_b`,
+`vendor_boot_b`, and `dtbo_b` were rewritten; `super` and userdata were not
+touched.
+
+Rollback coordinates:
+
+- Artifact directory: `husky-flash/tar-audio-lto/`
+- Device revision: `ca7a9eabea02ae0d1fe820b29403d85319dbf9e9`
+- Manifest revision: `a979a7abfe8800b845d653c6abdd9fadc96a0257`
+- Patches revision: `22c33ed85ad235fdc2bc09d4ef1a89379f5a207f`
+- boot-images.zip sha256:
+  `fcb8b563aea97b13cd198f756984d0b5741bbbeeb87b6d5793e3ba8e9b9a0c6a`
+- Kernel/module kver: `6.1.145-android14-11-g799ecb77416a`
+
+Post-boot verification at 23:53Z: slot `_b`, LightDM active with
+`NRestarts=0`, `/sys/power/autosleep` absent as expected on this baseline,
+`# CONFIG_PM_AUTOSLEEP is not set`, `CONFIG_LTO_CLANG_THIN=y`, pKVM chain
+loaded (`pkvm_s2mpu_v9`, `samsung_iommu_v9` with 21 refs), and
+NetworkManager connected/full. Evidence:
+`husky-verify/rollback-known-good-20261121/rollback-verification.txt`.
+
+Canonical `BRINGUP.md` now includes the CI precondition to verify the
+same-named manifest kernel release before pushing or dispatching a device
+branch. `husky-verify/NEXT-SESSION-NOTES.md` has the final branch tips,
+CI runs, artifact digests, evidence roots, and the next serialized action:
+scope the `bcmdhd4398` suspend-wakelock investigation separately.

@@ -92,86 +92,46 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-21T23:42Z
+2026-11-21T23:58Z
 
-- Canonical device branch: `test-audio-restore`. Phase 3 communications
-  documentation was committed separately on `phase3-comms-docs` (@e73001d)
-  and fast-forwarded here; `harden-build-release` is reserved for
-  build/release hardening only.
-- ON-DEVICE KNOWN-GOOD BASELINE (TESTED 2026-11-20): integrated family
-  kernel-patches-husky 22c33ed / manifest a979a7a / device test-audio-
-  restore (build code ca7a9ea; docs through 660bfb3+), coordinated tag
-  `known-good-r8-20261120` on all three repos. CI run 44612802506 debug
-  set (boot-images fcb8b563, kver g799ecb77416a) flashed boot-images-
-  only to slot b; pkvm chain verified (pkvm_s2mpu_v9 @2.4s,
-  samsung_iommu_v9 21 refs, 25 sysmmus incl HSI0, mfc-core on MFC-0,
-  zero fault/panic lines). DEFECT #6 CLOSED: YouTube with audio passed,
-  no panic/reboot. Clean-shutdown test PASSED (normal unmount, no
-  iommu_release_device panic). Evidence: husky-verify/NEXT-SESSION-NOTES.md
-  2026-11-20 section; BRINGUP-LOG 2026-11-20.
-- Promotion status: patches repo branch `main` created @22c33ed; manifest
-  repo branch `main` FF'd to a979a7a (its kernel CI is republishing
-  kernel.zip as release `main`). PENDING: FF device `main` to this
-  branch's head once the manifest `main` kernel.zip exists (FF-verified,
-  old main 107090e is an ancestor). Details: BRINGUP-LOG 2026-11-20.
-- Defect #1 bottom-screen artifact: RESOLVED on this baseline (mechanism
-  UNKNOWN; force60/wqhd queue MOOT). RUN-98 is superseded but retained as
-  fallback; both effective kernels use CONFIG_LTO_CLANG_THIN=y.
-- Defect #8 OPEN, intermittent, low-reproduction: the 2026-11-20 cold-off
-  Lomiri crash-loop did NOT recur in six valid controlled cold-off rounds
-  on 2026-11-21 (all `healthy-stable`, LightDM `NRestarts=0`). Evidence:
-  husky-verify/defect8-capture/evidence-20261121/ (verified SHA256SUMS).
-  Keep the capture unit enabled; do not declare the startup race fixed.
-- Phase 3 communications state (BRINGUP-LOG 2026-11-20, evidence
-  husky-verify/comms-20261120/): SMS works on the CURRENT INSTALLATION
-  only after the 0-byte history.sqlite recovery; defect #9's first-boot
-  DB-initialization root cause remains OPEN. MMS receive/display tested;
-  MMS send untested. Airplane mode and hotspot are PARTIAL: low-level/NM
-  mechanisms work, Lomiri indicator actions are defect #10. Bluetooth
-  media/A2DP/reconnect/suspend survival pass; call audio untested. NFC
-  is defect #11 (AIDL-capable nfcd plugin needed). VoLTE is research only.
-- Defect #12 REPRODUCED 2026-11-21 on the known-good baseline: after a
-  controlled deep suspend/resume followed by a failed suspend attempt in
-  `dhdpcie_pm_suspend`, wlan0/wlan1 remained UP/associated and NM claimed
-  connected/full, but both phone-side and host-side traffic failed. Driver
-  logs repeat `WLC_GET_ASSOCLIST error -19` / `failed to get assoc_info:
-  err=-19`. Full failed-state journal + dmesg were captured before reboot:
-  husky-verify/defect12-evidence-20261121/ (verified SHA256SUMS). Phone was
-  intentionally left in the failed state for inspection; PM_AUTOSLEEP
-  flashing/reboot will destroy it. NEVER unload bcmdhd4398.
+- Canonical device docs branch: `test-audio-restore` @ `3732ff5` (pushed).
+  Canonical device integration branch `main`: `24d9591`; manifest `main`:
+  `dd6cdda`; patches `main`: `22c33ed`. Hardening CI `44957022617` and
+  main-push CI `44958836687` succeeded; Agent 2 verified both complete
+  artifact sets. `BRINGUP.md` now records the same-named-kernel-release CI
+  precondition. Hard branch caveat: local-only unpushed docs commit `e352d76`
+  is not part of the green merge.
+- PHONE STATE: rolled back 2026-11-21T23:52Z to the preserved known-good
+  matched debug boot set (`husky-flash/tar-audio-lto/`, boot-images
+  fcb8b563; device ca7a9ea / manifest a979a7a / patches 22c33ed).
+  Verified kver `g799ecb77416a`, slot `_b`, LightDM active (`NRestarts=0`),
+  `/sys/power/autosleep` ENOENT, `# CONFIG_PM_AUTOSLEEP is not set`, pKVM
+  chain loaded, NM connected/full. Evidence: husky-verify/rollback-known-
+  good-20261121/.
+- Known-good baseline facts: defect #1 bottom artifact RESOLVED (mechanism
+  UNKNOWN); defect #6 CLOSED (YouTube with audio, no panic); clean
+  poweroff PASSED. Defect #8 remains OPEN after 6/6 healthy controlled
+  cold-offs (evidence: husky-verify/defect8-capture/evidence-20261121/).
+- Communications state: SMS works only after defect #9's zero-byte history
+  DB recovery; first-boot initialization remains OPEN. MMS receive/display
+  tested, send untested. Airplane/hotspot remain defect #10 partial; NFC is
+  defect #11; Bluetooth A2DP/reconnect/suspend survival pass, call audio
+  untested; VoLTE research only.
+- Defect #12 REPRODUCED on the known-good baseline: after suspend-path
+  failures, wlan0/wlan1 stayed UP/associated while traffic failed; driver
+  logs repeated `WLC_GET_ASSOCLIST error -19` / `failed to get assoc_info:
+  err=-19`. Full failed-state journal/dmesg: husky-verify/defect12-evidence-
+  20261121/. NEVER unload bcmdhd4398.
+- PM_AUTOSLEEP TEST FAILED/PARTIAL: CI `44960937874` green and the
+  Libsuspend path selected (`/sys/power/autosleep` exists, changed to `mem`),
+  but manual/automatic suspend entry failed in bcmdhd4398 (`Suspend failed
+  because of wakelock`, busy state `0x44`). Evidence: husky-verify/pm-
+  autosleep-20261121/. Incoming-call wake was not attempted.
 - CLEAN-INSTALL CHECK: after the next clean flash, verify
   `~/.local/share/history-service/history.sqlite` is non-zero and has the
-  expected schema before applying any SMS workaround; if it is 0-byte,
-  capture first-boot journal + lomiri-history-daemon logs first.
-- 2026-11-18 bootloop root cause (SOLVED, separate): incomplete flash —
-  stale vendor_kernel_boot_b. Guard: husky-verify/preflight-boot-images.sh
-  (wired into flash scripts; BRINGUP.md warns). Flash over root SSH via
-  /userdata (phablet sudo now needs a password; /tmp is PrivateTmp).
-- RAMOOPS FACT: cold poweroff wipes console-ramoops; use the persistent
-  journal (journalctl -b -N) for shutdown verdicts.
-- Phone: integrated baseline (on-device known-good) running, healthy.
-  Defect #7 audio stub work queued (husky-verify/audio-20261112/).
-  Unlisted hardware remains UNTESTED.
-- Hardening promotion COMPLETE: device CI run 44957022617 succeeded;
-  Agent 2 verified both complete normal/debug five-image sets, coordinated
-  revisions, kernel provenance, and 209-module kver consistency. Canonical
-  main was deliberately fast-forwarded to device `24d9591`, manifest
-  `dd6cdda`, with patches main already at `22c33ed`. The main-push CI run
-  44958836687 was in progress at this update; the merged tree is exactly
-  the green hardening commit.
-- PM_AUTOSLEEP experiment STOPPED after evidence capture: CI run
-  44960937874 green; matched debug boot set flashed (kver gc5e9bc394477).
-  `/sys/power/autosleep` exists and repowerd successfully selected the
-  Libsuspend path (no fallback log; it changed autosleep to `mem`).
-  However, both manual and automatic suspend failed to enter suspend:
-  bcmdhd4398 reported internal wakelock/busy state (`dhdpcie_bus_suspend:
-  Suspend failed because of wakelock`, `dhd_bus_busy_state: 0x44`).
-  Autosleep was set back to `off`; evidence:
-  husky-verify/pm-autosleep-20261121/ (verified SHA256SUMS). Do not run
-  incoming-call wake until suspend-entry is reliable. Phone remains on the
-  PM test image pending a deliberate rollback/investigation decision.
-- Next discriminating actions, in priority order: (1) decide whether to
-  roll back to the known-good baseline or isolate the bcmdhd4398 suspend
-  wakelock as its own experiment; (2) only then schedule defect #10,
-  defect #11, remaining communications tests, VoLTE research, defect #7,
-  and patch-stack isolation as separately scoped work.
+  expected schema before any SMS workaround; if 0-byte, capture first-boot
+  journal + history-daemon logs first.
+- Next discriminating action: scope the bcmdhd4398 suspend-wakelock
+  investigation as its own experiment (defect #12 / PM suspend-entry
+  blocker). Only after that, schedule #10, #11, remaining communications
+  tests, VoLTE research, #7, and patch-stack isolation separately.

@@ -31,6 +31,8 @@ The debug image is for bring-up only. It enables temporary RNDIS rescue networki
 
 `dependencies.lock` pins the build-tools commit and records SHA-256 checksums for the Halium system image, libhybris update, LineageOS zip, Halium initramfs, and recovery image. The workflow resolves the exact kernel release for the current branch and fails if that release or its checksum metadata is missing.
 
+CI precondition: before pushing or dispatching a device branch in a way that triggers CI, verify that the same-named manifest kernel release exists and has passed artifact verification. The device workflow resolves `kernel.zip` from the manifest repo's rolling release named after the device branch, so pushing the device branch first fails the build at the resolve step (both `harden-build-release` device runs on 2026-11-20). Push the manifest branch first, wait for its kernel CI to publish the release, verify the artifact, then push or dispatch the device branch.
+
 Do not replace these inputs with floating `lastSuccessfulBuild` URLs or a silently fallback kernel branch.
 
 ## Local preflight
