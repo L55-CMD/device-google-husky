@@ -118,21 +118,26 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   tested, send untested. Airplane/hotspot remain defect #10 partial; NFC is
   defect #11; Bluetooth A2DP/reconnect/suspend survival pass, call audio
   untested; VoLTE research only.
-- Defect #12 REPRODUCED on the known-good baseline: after suspend-path
-  failures, wlan0/wlan1 stayed UP/associated while traffic failed; driver
-  logs repeated `WLC_GET_ASSOCLIST error -19` / `failed to get assoc_info:
-  err=-19`. Full failed-state journal/dmesg: husky-verify/defect12-evidence-
-  20261121/. NEVER unload bcmdhd4398.
-- PM_AUTOSLEEP TEST FAILED/PARTIAL: CI `44960937874` green and the
-  Libsuspend path selected (`/sys/power/autosleep` exists, changed to `mem`),
-  but manual/automatic suspend entry failed in bcmdhd4398 (`Suspend failed
-  because of wakelock`, busy state `0x44`). Evidence: husky-verify/pm-
-  autosleep-20261121/. Incoming-call wake was not attempted.
+- Defect #12 CLASSIFIED (offline, TESTED from capture): the bcmdhd4398
+  dongle trapped at deep-suspend resume (`pciedev_host_wake_asserted_for_
+  too_long`), after which the driver wedged and `WLC_GET_ASSOCLIST` /
+  `assoc_info` returned -19; no recovery ran. NM/supplicant/rfkill were
+  stale-state victims, not causes. See defect12-evidence-20261121/
+  CLASSIFICATION-20261121.md. NEVER unload bcmdhd4398.
+- PM_AUTOSLEEP TEST FAILED/PARTIAL and now classified separately from #12:
+  CI `44960937874` green; Libsuspend path selected, but logind/NM/
+  wpa_supplicant Wi-Fi teardown raced PM suspend and left a stuck dhd `wl`
+  wakelock (`wakelock c-1 wl-1`; `0x44` busy state). `autosleep=mem`
+  retried against the locked driver; no system suspend was entered.
+  Evidence: husky-verify/pm-autosleep-20261121/.
 - CLEAN-INSTALL CHECK: after the next clean flash, verify
   `~/.local/share/history-service/history.sqlite` is non-zero and has the
   expected schema before any SMS workaround; if 0-byte, capture first-boot
   journal + history-daemon logs first.
-- Next discriminating action: scope the bcmdhd4398 suspend-wakelock
-  investigation as its own experiment (defect #12 / PM suspend-entry
-  blocker). Only after that, schedule #10, #11, remaining communications
-  tests, VoLTE research, #7, and patch-stack isolation separately.
+- Next discriminating action, pending explicit approval: P1 on the
+  known-good image — autosleep off, `nmcli networking off`, wait ~5s, then
+  one manual suspend / `rtcwake -m mem -s 20`; capture dmesg/journal. This
+  tests whether suspend enters cleanly when live Wi-Fi teardown is removed.
+  Do not unload bcmdhd4398. Only after the suspend-path result, schedule
+  #10, #11, remaining communications tests, VoLTE research, #7, and
+  patch-stack isolation separately.

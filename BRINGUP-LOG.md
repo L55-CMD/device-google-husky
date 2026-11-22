@@ -785,3 +785,35 @@ same-named manifest kernel release before pushing or dispatching a device
 branch. `husky-verify/NEXT-SESSION-NOTES.md` has the final branch tips,
 CI runs, artifact digests, evidence roots, and the next serialized action:
 scope the `bcmdhd4398` suspend-wakelock investigation separately.
+
+
+## 2026-11-22 — bcmdhd4398 suspend failures classified into two separate defects
+
+Agent 2 completed the bounded offline classification of the defect-#12 and
+PM_AUTOSLEEP evidence.
+
+Defect #12 (known-good baseline, `defect12-evidence-20261121/`): the
+first genuine ~23-second deep suspend entered cleanly, but the dongle
+trapped during resume with `pciedev_host_wake_asserted_for_too_long`.
+The driver then wedged (`WLC_GET_ASSOCLIST error -19`, `failed to get
+assoc_info`), and no hang recovery ever ran. NetworkManager,
+wpa_supplicant, rfkill/urfkill, and the indicator were reporting stale
+state; they are not the cause. Full classification:
+`CLASSIFICATION-20261121.md`.
+
+PM_AUTOSLEEP blocker (`pm-autosleep-20261121/`): a separate
+suspend-entry race. logind sleep handling caused NM/wpa_supplicant Wi-Fi
+teardown while PM suspend was starting; the bcmdhd4398 suspend callback
+then hit busy state `0x44` and left a stuck dhd `wl` wakelock
+(`wakelock c-1 wl-1`). With `/sys/power/autosleep=mem`, the kernel kept
+retrying against the locked driver. No `PM: suspend entry` line ever
+appeared in that capture, so the PM failure is not evidence about
+deep-suspend resume.
+
+Next single phone test, pending explicit approval: on the known-good
+image with autosleep absent/off, disable networking (`nmcli networking
+off`), wait about five seconds, then perform one manual suspend or
+`rtcwake -m mem -s 20`. Capture dmesg/journal before and after. The
+prediction is that removing live Wi-Fi teardown lets suspend enter
+cleanly; failure with a persistent `c-1 wl-1` lock would instead point
+at the autosleep retry path itself. Do not unload `bcmdhd4398`.
