@@ -819,7 +819,7 @@ cleanly; failure with a persistent `c-1 wl-1` lock would instead point
 at the autosleep retry path itself. Do not unload `bcmdhd4398`.
 
 
-## 2026-11-22 — P1–P4: suspend characterized end-to-end; defect #12 reproduced on demand + recovery found
+## 2026-11-22 — P1–P4: suspend characterized end-to-end; defect #12 reproduced (bounded retries) + recovery found
 
 Four bounded on-device experiments on the known-good baseline (kver
 `g799ecb77416a`, slot `_b`; evidence roots `husky-verify/p{1..4}-suspend-20261122/`
@@ -864,9 +864,10 @@ identical to the 2026-11-21 classification. The `-19` wedge followed
 **Observed repro conditions (P4; quiet-LAN dependent — reproducible
 within bounded RTC-loop retries, not one-shot "on demand"):** (1) WoWLAN armed
 (disabled -> policy -16, never sleeps); (2) a genuine deep suspend —
-clean at 2.2 s (P2), traps at 33 s (P4), threshold in between; (3) any
-resume source (RTC suffices; the 2026-11-21 wake source is not
-implicated).
+clean at 2.2 s (P2), traps at 33 s (P4): a BRACKET, not a threshold
+(nothing between 2.2 s and 33 s is probed); (3) RTC resume tested
+(WoWLAN-armed; "any resume source" NOT proven —
+the 2026-11-21 wake source is not implicated, but no other source was tested).
 
 **Recovery (TESTED):** `nmcli networking off`, 8 s, `nmcli networking
 on` — the driver's own stop/start reset reloaded the firmware
@@ -887,7 +888,8 @@ The P1-P4 section above overstated four points. Corrected record:
 
 1. **"Suspend track closed" is retracted.** Defect #12 remains OPEN
    until a workaround or fix is integrated and validated on device.
-   Today's state is: characterization complete, repro on demand,
+   Today's state is: characterization complete, repro within bounded RTC
+   retries (quiet-LAN dependent),
    recovery proven, prevention designed — nothing integrated yet.
 2. P4 reproduced the trap with WoWLAN `any` + a 33 s deep suspend +
    **RTC** resume. It does NOT prove "any resume source" triggers the
