@@ -2,21 +2,23 @@
 # 00-husky-wifi-quiesce — systemd sleep hook (pre) [DRY-RUN SAFE]
 # Waits for logind-triggered Wi-Fi teardown to settle before kernel suspend.
 # Basis: P1 (husky-verify/p1-suspend-20261122/). Never blocks suspend >20s.
-# Argument: "pre" (we only act on pre). Exit 0 always.
+# Reviewed by Agent 2 2026-11-22: S1 (two wlan ifaces) mitigated by logging
+# remaining devices at timeout; 20s/8s bounds are starting values, tuned in
+# stage 2 from per-cycle evidence. Exit 0 always.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 TAG="husky-sleep-hook"
 [ "$1" = "pre" ] || exit 0
 log() { echo "$TAG[pre] $*"; logger -t "$TAG" "$*"; }
 log "start $(date -u +%FT%H:%M:%SZ)"
 
-# Only act if a managed wifi device was connected/active before suspend.
+# Only act if a managed wifi device is connected/active before suspend.
 if ! nmcli -t -f TYPE,STATE device | grep -q "^wifi:connected"; then
     log "no connected wifi; nothing to wait for"
     exit 0
 fi
 log "wifi connected pre-suspend; waiting for teardown to settle"
 
-# Poll until wifi devices leave connected state (logind PrepareForSleep
-# teardown), max 20 s.
+# Poll until no wifi device reports connected, max 20 s.
 i=0
 while [ $i -lt 20 ]; do
     if ! nmcli -t -f TYPE,STATE device | grep -q "^wifi:connected"; then
@@ -26,9 +28,15 @@ while [ $i -lt 20 ]; do
     sleep 1
     i=$((i+1))
 done
-[ $i -ge 20 ] && log "WARN: 20s timeout; suspend proceeds with teardown possibly in flight"
+if [ $i -ge 20 ]; then
+    # S1: enumerate what is still connected so stage 2 can tune this.
+    REMAIN=$(nmcli -t -f DEVICE,TYPE,STATE device | grep ":wifi:connected" | tr '\n' ' ')
+    log "WARN: 20s timeout; still connected: ${REMAIN:-unknown}; suspend proceeds"
+fi
 
 # P1-observed busy-state drain after teardown completes (8 s margin).
+# S2: reference point is teardown-complete (state flip), not teardown-start;
+# stage 2 measures teardown-complete -> suspend-entry and tunes this.
 sleep 8
 log "settle done; handing to suspend $(date -u +%FT%H:%M:%SZ)"
 exit 0
