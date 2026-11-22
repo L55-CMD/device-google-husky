@@ -1,0 +1,78 @@
+#!/bin/bash
+# 90-husky-wifi-recover — systemd sleep hook (post) [Change 2]
+# Post-resume wedge detector + sanctioned recovery for defect #12.
+# Design (spec husky-verify/repowerd-suspend-hooks-spec.md, Agent 2 review):
+# - grace window: poll local health every 2 s up to 30 s before any WEDGE
+#   declaration (a healthy slow reconnect must NOT trigger a driver reset)
+# - detector ladder is LOCAL-first: driver/ioctl health (iw runs at all —
+#   the P4 wedge fails ioctls with -19), then association. Internet/ping
+#   checks are NOT used for wedge decisions (ISP outage must not cause
+#   restarts); they are SKIP-only diagnostics.
+# - recovery is snapshot-gated (Change 1 pre-hook writes
+#   /run/husky-sleep-pre-state): the global NM off/on fallback runs ONLY if
+#   networking was enabled pre-suspend; state is restored afterwards.
+# - exactly ONE recovery attempt per resume; terminal state otherwise;
+#   evidence (dhd dmesg tail + detector results) to the journal. Exit 0.
+# - NEVER rmmod/modprobe bcmdhd4398, never rfkill-cycle.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+TAG="husky-sleep-hook"
+STATE=/run/husky-sleep-pre-state
+log() { echo "$TAG[post] $*"; logger -t "$TAG" "post: $*"; }
+[ "$1" = "post" ] || exit 0
+log "start $(date -u +%FT%H:%M:%SZ)"
+sleep 10   # resume settle
+
+# wifi devices that were connected pre-suspend (from the Change 1 snapshot)
+PRE_CONN=""
+[ -f "$STATE" ] && PRE_CONN=$(grep ':wifi:connected' "$STATE" | cut -d: -f1)
+[ -z "$PRE_CONN" ] && PRE_CONN=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | awk -F: '$2=="wifi" && $3=="connected"{print $1}')
+if [ -z "$PRE_CONN" ]; then
+    log "no pre-suspend connected wifi; nothing to verify"
+    exit 0
+fi
+
+health_check() { # returns 0 if ALL pre-connected devices are locally healthy
+    local dev
+    for dev in $PRE_CONN; do
+        # driver/ioctl level: the P4 wedge makes this fail with -19
+        if ! iw dev "$dev" link >/dev/null 2>&1; then
+            echo "DRIVER:$dev"
+            return 1
+        fi
+        if ! iw dev "$dev" link 2>/dev/null | grep -q "Connected"; then
+            echo "ASSOC:$dev"
+            return 1
+        fi
+    done
+    return 0
+}
+
+# grace window: poll up to 30 s (every 2 s)
+i=0
+while [ $i -lt 15 ]; do
+    RESULT=$(health_check) && { log "healthy after resume (grace ${i}x2s)"; exit 0; }
+    sleep 2; i=$((i+1))
+done
+log "WEDGE suspected after 30 s grace: $RESULT"
+
+# recovery (snapshot-gated)
+if [ -f "$STATE" ] && ! grep -q '^networking=enabled' "$STATE"; then
+    log "recovery SKIPPED: snapshot shows networking was NOT enabled pre-suspend (user had it off); leaving state untouched"
+    log "evidence dmesg tail: $(dmesg | grep -iE 'dhd|Dongle|host_wake' | tail -3 | tr '\n' '|')"
+    exit 0
+fi
+
+log "running sanctioned recovery: nmcli networking off/on (driver stop/start reset)"
+nmcli networking off
+sleep 5
+nmcli networking on
+
+# verify recovery (bounded, 40 s)
+r=0
+while [ $r -lt 20 ]; do
+    RESULT=$(health_check) && { log "recovery OK after $((r*2))s"; exit 0; }
+    sleep 2; r=$((r+1))
+done
+log "recovery INCOMPLETE: still '$RESULT' after 40 s; terminal for this resume"
+log "evidence dmesg tail: $(dmesg | grep -iE 'dhd|Dongle|host_wake|error -19' | tail -5 | tr '\n' '|')"
+exit 0
