@@ -861,7 +861,8 @@ no etd` and hang reason
 identical to the 2026-11-21 classification. The `-19` wedge followed
 (SSSR dump ran; firmware stayed dead; NM stale "connected").
 
-**Established repro conditions for defect #12:** (1) WoWLAN armed
+**Observed repro conditions (P4; quiet-LAN dependent — reproducible
+within bounded RTC-loop retries, not one-shot "on demand"):** (1) WoWLAN armed
 (disabled -> policy -16, never sleeps); (2) a genuine deep suspend —
 clean at 2.2 s (P2), traps at 33 s (P4), threshold in between; (3) any
 resume source (RTC suffices; the 2026-11-21 wake source is not
