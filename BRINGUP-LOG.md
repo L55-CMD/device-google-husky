@@ -925,3 +925,52 @@ The P1-P4 section above overstated four points. Corrected record:
 - Post-resume recovery must check local association/driver health
   BEFORE any Internet ping, with a cooldown/single-attempt limit so a
   network outage cannot cause an endless NetworkManager restart loop.
+
+
+## 2026-11-22 (evening) — User hardware matrix results + defect updates
+
+User-tested on the current debug build (known-good kernel + `a0bab3e`
+device tree with sleep hooks):
+
+**WORKS (user-verified):**
+- SMS send and receive; MMS send (receive/display was already tested).
+  Defect #9's remaining scope is now only first-boot init on a clean
+  install.
+- **Call audio bidirectional** — defect #2 candidate closure (repeat
+  confirmation advised before closing; mechanism was the integrated
+  baseline's vendor audio routing).
+- Offline charging (charging screen when powered off + cable).
+- Camera full set: front/back, photo, video, flash, torch.
+- Bluetooth A2DP reconnect + playback.
+- **Overnight suspend: clean wake, Wi-Fi reconnected** — first
+  real-world idle-suspend pass, consistent with the P1-P4 conclusions.
+- Airplane toggle in Settings drops/restores radios (rfkill-backed;
+  urfkill service itself remains absent from the image).
+
+**FAILS:**
+- Hotspot from the Lomiri UI ("failed to create hotspot") — the NM-level
+  AP works (tested via `nmcli device wifi hotspot`); the UI action path
+  is the remaining defect. Client join untested.
+- **GPS/location** — ROOT-CAUSED: `lomiri-location-service` SEGVs at
+  startup: the default gps provider needs `libubuntu_application_api.so`
+  (Ubuntu Platform API), which is absent from the image (and from the
+  available apt repos), and `/var/lib/lomiri-location-service/config.ini`
+  is missing so no provider can be configured out. Fix options:
+  package/provide the UAL library (ABI work) or write a hybris-binder
+  GPS provider against the container's `android.hardware.gnss.IGnss`
+  (HAL + kernel drivers verified present and running). The service
+  fails inert (no location, no crash loop).
+
+**Untested:** wireless charging, NFC tag read, USB-C DisplayPort,
+fingerprint.
+
+**Also this date:**
+- Auto-brightness: NOT a missing toggle — the entire backend is absent
+  (no sensorfw ALS adaptor/plugins on image; repowerd 2025.01 has no
+  light-sensor support). Feature requires building that layer.
+- Proximity-in-call works; clock widget (#4) no longer reproduces —
+  defect #4 closed (mechanism unknown, same class as defect #1).
+- Suspend track completed: quiesce hook v2 + post-resume auto-heal
+  (Change 2, `ee64390`), deep-suspend race-window method validated
+  (clean 3.6-55.3 s deep suspends, zero defect-#12 signatures with
+  teardown-first). See the earlier 2026-11-22 sections.
