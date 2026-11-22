@@ -117,11 +117,19 @@ LTO_NONE fragment stays because it is part of the validated source tree.
 - Known-good baseline facts: defect #1 bottom artifact RESOLVED
   (mechanism UNKNOWN); defect #6 CLOSED; clean poweroff PASSED; defect
   #8 OPEN (6/6 healthy cold-offs, no repro).
-- Communications state: SMS works only after defect #9's zero-byte
-  history DB recovery; first-boot init OPEN. MMS receive/display tested,
-  send untested. Airplane/hotspot defect #10 partial; NFC defect #11;
+- Communications state: NEW REGRESSION 2026-11-22 — SIM ABSENT at
+  baseband level since 2026-11-21 23:33Z (rild CardState ABSENT both
+  slots, ofono SimManager Present=false, NOT cleared by reboot; evidence
+  husky-verify/comms-20261122-radio-regression/). User must reseat the SIM
+  first; if a reseated SIM still reads ABSENT, treat as suspend-induced
+  damage and escalate. Secondary: vendor.google.radioext@1.0-service
+  crash-loop (use-after-destroy mutex, tombstone captured) — likely
+  collateral of the SIM-less state; fix after SIM is resolved.
+  Pre-regression: SMS works only after defect #9's zero-byte history DB
+  recovery; first-boot init OPEN. MMS receive/display tested, send
+  untested. Airplane/hotspot defect #10 partial; NFC defect #11;
   Bluetooth A2DP/reconnect/suspend pass, call audio untested; VoLTE
-  research only.
+  Register experiment queued behind the SIM fix.
 - CLEAN-INSTALL CHECK: after the next clean flash, verify
   `~/.local/share/history-service/history.sqlite` is non-zero with the
   expected schema before any SMS workaround; if 0-byte, capture
