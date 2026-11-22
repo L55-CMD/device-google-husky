@@ -1,42 +1,59 @@
 #!/bin/bash
-# 00-husky-wifi-quiesce — systemd sleep hook (pre) [DRY-RUN SAFE]
-# Waits for logind-triggered Wi-Fi teardown to settle before kernel suspend.
-# Basis: P1 (husky-verify/p1-suspend-20261122/). Never blocks suspend >20s.
-# Reviewed by Agent 2 2026-11-22: S1 (two wlan ifaces) mitigated by logging
-# remaining devices at timeout; 20s/8s bounds are starting values, tuned in
-# stage 2 from per-cycle evidence. Exit 0 always.
+# 00-husky-wifi-quiesce — systemd sleep hook (pre AND post)
+# v2 2026-11-22: ACTIVE quiesce — stage-0 evidence (2026-11-22T16:52Z) proved
+# logind suspend on this image does NOT tear Wi-Fi down (the wait-only v1
+# always hit its 20 s timeout and dhd then failed suspend: suspend_stats
+# fail 0->2, last_failed_dev=0001:01:00.0). P1 proved teardown-BEFORE-suspend
+# (nmcli networking off, ~5 s drain) makes suspend enter cleanly.
+# Design constraints (Agent 2 review): snapshot user state, restore it after,
+# never force-enable what the user disabled, bounded, exit 0 always.
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 TAG="husky-sleep-hook"
-[ "$1" = "pre" ] || exit 0
-log() { echo "$TAG[pre] $*"; logger -t "$TAG" "$*"; }
-log "start $(date -u +%FT%H:%M:%SZ)"
+STATE=/run/husky-sleep-pre-state
+log() { echo "$TAG[$1] $2"; logger -t "$TAG" "$1: $2"; }
 
-# Only act if a managed wifi device is connected/active before suspend.
-if ! nmcli -t -f TYPE,STATE device | grep -q "^wifi:connected"; then
-    log "no connected wifi; nothing to wait for"
-    exit 0
-fi
-log "wifi connected pre-suspend; waiting for teardown to settle"
+case "$1" in
+pre)
+    log pre "start $(date -u +%FT%H:%M:%SZ)"
+    # --- snapshot state for post-restore ---
+    mkdir -p /run
+    {   echo "networking=$(nmcli networking 2>/dev/null)"
+        nmcli -t -f DEVICE,TYPE,STATE device | grep -E ':wifi' || true
+    } > "$STATE" 2>/dev/null
+    log pre "snapshot: $(tr '\n' ' ' < $STATE)"
 
-# Poll until no wifi device reports connected, max 20 s.
-i=0
-while [ $i -lt 20 ]; do
+    # Only quiesce if a managed wifi device is connected.
     if ! nmcli -t -f TYPE,STATE device | grep -q "^wifi:connected"; then
-        log "teardown complete after ${i}s"
-        break
+        log pre "no connected wifi; nothing to quiesce"
+        exit 0
     fi
-    sleep 1
-    i=$((i+1))
-done
-if [ $i -ge 20 ]; then
-    # S1: enumerate what is still connected so stage 2 can tune this.
-    REMAIN=$(nmcli -t -f DEVICE,TYPE,STATE device | grep ":wifi:connected" | tr '\n' ' ')
-    log "WARN: 20s timeout; still connected: ${REMAIN:-unknown}; suspend proceeds"
-fi
+    log pre "wifi connected; active quiesce (networking off)"
 
-# P1-observed busy-state drain after teardown completes (8 s margin).
-# S2: reference point is teardown-complete (state flip), not teardown-start;
-# stage 2 measures teardown-complete -> suspend-entry and tunes this.
-sleep 8
-log "settle done; handing to suspend $(date -u +%FT%H:%M:%SZ)"
-exit 0
+    nmcli networking off
+    # wait for teardown to complete (max 20 s)
+    i=0
+    while [ $i -lt 20 ]; do
+        nmcli -t -f TYPE,STATE device | grep -q "^wifi:connected" || { log pre "teardown complete after ${i}s"; break; }
+        sleep 1; i=$((i+1))
+    done
+    [ $i -ge 20 ] && log pre "WARN: 20s timeout; still connected: $(nmcli -t -f DEVICE,TYPE,STATE device | grep ':wifi:connected' | tr '\n' ' ')"
+    # P1-observed busy-state drain after teardown (8 s margin)
+    sleep 8
+    log pre "quiesce done; handing to suspend $(date -u +%FT%H:%M:%SZ)"
+    exit 0
+    ;;
+post)
+    log post "start $(date -u +%FT%H:%M:%SZ)"
+    # restore EXACTLY the snapshot: only re-enable networking if it was on.
+    if [ -f "$STATE" ]; then
+        grep -q "^networking=enabled" "$STATE" && { nmcli networking on; log post "restored networking=on per snapshot"; }
+        rm -f "$STATE"
+    else
+        log post "no snapshot; leaving state untouched"
+    fi
+    exit 0
+    ;;
+*)
+    exit 0
+    ;;
+esac
