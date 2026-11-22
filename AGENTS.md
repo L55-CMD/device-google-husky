@@ -98,22 +98,23 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   branch `main`: `24d9591`; manifest `main`: `dd6cdda`; patches `main`:
   `22c33ed` (all CI-green). PHONE: known-good matched debug boot set
   (kver `g799ecb77416a`, slot `_b`), healthy, uptime continuous.
-- SUSPEND TRACK CLOSED (P1-P4, all TESTED 2026-11-22, evidence
-  `husky-verify/p{1..4}-suspend-20261122/`): manual suspend/resume works
-  when Wi-Fi is quiesced BEFORE the request (`nmcli networking off`, ~5 s
-  settle). Defect #12 REPRODUCED on demand: WoWLAN armed + genuine deep
-  suspend (>= ~30 s; clean at 2.2 s, traps at 33 s) -> dongle trap at
-  resume, hang reason `pciedev_host_wake_asserted_for_too_long+0x53`
-  (byte-identical to 2026-11-21). Recovery TESTED: `nmcli networking
-  off` + `on` (driver stop/start reset, NO module unload) restores Wi-Fi
-  fully. PM_AUTOSLEEP blocker root cause: teardown-DURING-suspend race
-  (stuck dhd `wl` wakelock), NOT a resume defect. WoWLAN-disabled +
-  interface up = policy -16 (EBUSY), not a wedge. Do NOT unload
-  `bcmdhd4398`. Full write-up: BRINGUP-LOG.md 2026-11-22 P1-P4 section.
-- Suspend workarounds: prevention (repowerd pre-suspend Wi-Fi quiesce)
-  + cure (post-resume health check -> NM restart). Design spec:
-  `husky-verify/repowerd-suspend-hooks-spec.md` (implementation pending
-  decision).
+- SUSPEND TRACK: characterization complete (P1-P4, TESTED 2026-11-22,
+  evidence husky-verify/p{1..4}-suspend-20261122/), but defect #12
+  remains OPEN until a workaround/fix is integrated and validated.
+  Bracket, not threshold: armed deep suspend failed at 33 s (RTC resume;
+  hang reason identical to 2026-11-21), passed at 2.2 s; 'any resume
+  source' NOT proven (RTC only); WoWLAN-disabled untestable (policy -16
+  blocks suspend). P1 strongly supports the teardown-race diagnosis and
+  validates quiescing as a workaround, but is not universal proof alone.
+  Do NOT unload `bcmdhd4398`. Staged plan: quiesce hook -> >33 s deep-
+  suspend validation -> PM_AUTOSLEEP increment -> auto-heal (separate) ->
+  comms. Spec: husky-verify/repowerd-suspend-hooks-spec.md.
+- Suspend hooks: pre-suspend quiesce shipped in overlay-debug (quiesce
+  ONLY; auto-heal intentionally deferred to a separate change after
+  quiesce validation). Runtime install impossible (RO rootfs). Staged
+  validation: deep suspends >33 s with quiesce hook, then PM_AUTOSLEEP
+  increment, then auto-heal. Spec: husky-verify/repowerd-suspend-hooks-
+  spec.md.
 - Known-good baseline facts: defect #1 bottom artifact RESOLVED
   (mechanism UNKNOWN); defect #6 CLOSED; clean poweroff PASSED; defect
   #8 OPEN (6/6 healthy cold-offs, no repro).
@@ -133,8 +134,10 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   `~/.local/share/history-service/history.sqlite` is non-zero with the
   expected schema before any SMS workaround; if 0-byte, capture
   first-boot journal + history-daemon logs first.
-- Next discriminating actions (no phone risk, in order): (1) implement
-  or schedule the repowerd suspend hooks per the spec; (2) remaining
-  comms queue: SMS first-boot init, MMS send, defect #10/#11, VoLTE
-  Register experiment; (3) audio defect #7 (needs the stable-image
-  binder work); (4) kernel patch-stack isolation bisect.
+- Next discriminating actions (in order): (1) flash the quiesce-hook
+  debug image (approval) and validate repeated genuine deep suspends
+  >33 s (clean resume, correct network restoration); (2) re-test with
+  PM_AUTOSLEEP incrementally; (3) implement post-resume auto-heal as a
+  separate change; (4) only then: SMS end-to-end + MMS send with user,
+  defect #10/#11, audio defect #7; (5) kernel patch-stack isolation
+  bisect; (6) r12 freeze bisect before any kernel-foundation move.

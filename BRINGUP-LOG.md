@@ -878,3 +878,47 @@ Net: suspend/resume is workable today via prevention (pre-suspend
 quiesce) plus cure (post-resume NM reset if wedged). Real fixes remain
 firmware/driver-side. WoWLAN currently set to `any` (cosmetic; reverts
 on reboot). Do NOT unload `bcmdhd4398`.
+
+
+## 2026-11-22 — Corrections to the P1-P4 section (review-driven)
+
+The P1-P4 section above overstated four points. Corrected record:
+
+1. **"Suspend track closed" is retracted.** Defect #12 remains OPEN
+   until a workaround or fix is integrated and validated on device.
+   Today's state is: characterization complete, repro on demand,
+   recovery proven, prevention designed — nothing integrated yet.
+2. P4 reproduced the trap with WoWLAN `any` + a 33 s deep suspend +
+   **RTC** resume. It does NOT prove "any resume source" triggers the
+   trap — only the RTC wake was tested.
+3. WoWLAN-armed is NOT proven strictly required for the trap.
+   Disabling WoWLAN makes `dhdpcie_pm_suspend` return -16, so that
+   condition never reached a deep suspend and could not test the trap.
+4. The duration result is a **bracket** (2.2 s passed, 33 s failed),
+   not an established threshold.
+5. P1's single clean teardown-first cycle strongly supports the
+   teardown-race diagnosis and validates quiescing as a workaround,
+   but one clean cycle is not universal proof by itself.
+
+**Agreed implementation order (2026-11-22 review):**
+1. Finish and review the hook specification (design constraints below).
+2. Implement and validate the pre-suspend Wi-Fi quiesce **alone**.
+3. Repeated genuine deep suspends >33 s with the quiesce hook:
+   confirm clean resume and correct network restoration.
+4. Test the validated hook with PM_AUTOSLEEP as the next incremental
+   experiment.
+5. Implement the post-resume auto-heal as a **separate** change
+   (bounded retries, evidence capture).
+6. Only then: VoLTE Register experiment and remaining communications
+   work.
+
+**Design constraints the spec must satisfy (review):**
+- No blind global `nmcli networking off/on` in production behavior:
+  preserve the user's prior networking/Wi-Fi state, never enable Wi-Fi
+  the user disabled, handle hotspot/airplane cases.
+- A `systemd-sleep` hook does NOT run when libsuspend writes autosleep
+  directly — the spec must identify the actual execution path on both
+  the logind path and the libsuspend path.
+- Post-resume recovery must check local association/driver health
+  BEFORE any Internet ping, with a cooldown/single-attempt limit so a
+  network outage cannot cause an endless NetworkManager restart loop.
