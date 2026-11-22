@@ -92,52 +92,42 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-21T23:58Z
+2026-11-22
 
-- Canonical device docs branch: `test-audio-restore` (latest pushed commit;
-  rollback/CI-precondition record: `9fb3bc1`).
-  Canonical device integration branch `main`: `24d9591`; manifest `main`:
-  `dd6cdda`; patches `main`: `22c33ed`. Hardening CI `44957022617` and
-  main-push CI `44958836687` succeeded; Agent 2 verified both complete
-  artifact sets. `BRINGUP.md` now records the same-named-kernel-release CI
-  precondition. Hard branch caveat: local-only unpushed docs commit `e352d76`
-  is not part of the green merge.
-- PHONE STATE: rolled back 2026-11-21T23:52Z to the preserved known-good
-  matched debug boot set (`husky-flash/tar-audio-lto/`, boot-images
-  fcb8b563; device ca7a9ea / manifest a979a7a / patches 22c33ed).
-  Verified kver `g799ecb77416a`, slot `_b`, LightDM active (`NRestarts=0`),
-  `/sys/power/autosleep` ENOENT, `# CONFIG_PM_AUTOSLEEP is not set`, pKVM
-  chain loaded, NM connected/full. Evidence: husky-verify/rollback-known-
-  good-20261121/.
-- Known-good baseline facts: defect #1 bottom artifact RESOLVED (mechanism
-  UNKNOWN); defect #6 CLOSED (YouTube with audio, no panic); clean
-  poweroff PASSED. Defect #8 remains OPEN after 6/6 healthy controlled
-  cold-offs (evidence: husky-verify/defect8-capture/evidence-20261121/).
-- Communications state: SMS works only after defect #9's zero-byte history
-  DB recovery; first-boot initialization remains OPEN. MMS receive/display
-  tested, send untested. Airplane/hotspot remain defect #10 partial; NFC is
-  defect #11; Bluetooth A2DP/reconnect/suspend survival pass, call audio
-  untested; VoLTE research only.
-- Defect #12 CLASSIFIED (offline, TESTED from capture): the bcmdhd4398
-  dongle trapped at deep-suspend resume (`pciedev_host_wake_asserted_for_
-  too_long`), after which the driver wedged and `WLC_GET_ASSOCLIST` /
-  `assoc_info` returned -19; no recovery ran. NM/supplicant/rfkill were
-  stale-state victims, not causes. See defect12-evidence-20261121/
-  CLASSIFICATION-20261121.md. NEVER unload bcmdhd4398.
-- PM_AUTOSLEEP TEST FAILED/PARTIAL and now classified separately from #12:
-  CI `44960937874` green; Libsuspend path selected, but logind/NM/
-  wpa_supplicant Wi-Fi teardown raced PM suspend and left a stuck dhd `wl`
-  wakelock (`wakelock c-1 wl-1`; `0x44` busy state). `autosleep=mem`
-  retried against the locked driver; no system suspend was entered.
-  Evidence: husky-verify/pm-autosleep-20261121/.
+- Canonical device docs branch: `test-audio-restore`; device integration
+  branch `main`: `24d9591`; manifest `main`: `dd6cdda`; patches `main`:
+  `22c33ed` (all CI-green). PHONE: known-good matched debug boot set
+  (kver `g799ecb77416a`, slot `_b`), healthy, uptime continuous.
+- SUSPEND TRACK CLOSED (P1-P4, all TESTED 2026-11-22, evidence
+  `husky-verify/p{1..4}-suspend-20261122/`): manual suspend/resume works
+  when Wi-Fi is quiesced BEFORE the request (`nmcli networking off`, ~5 s
+  settle). Defect #12 REPRODUCED on demand: WoWLAN armed + genuine deep
+  suspend (>= ~30 s; clean at 2.2 s, traps at 33 s) -> dongle trap at
+  resume, hang reason `pciedev_host_wake_asserted_for_too_long+0x53`
+  (byte-identical to 2026-11-21). Recovery TESTED: `nmcli networking
+  off` + `on` (driver stop/start reset, NO module unload) restores Wi-Fi
+  fully. PM_AUTOSLEEP blocker root cause: teardown-DURING-suspend race
+  (stuck dhd `wl` wakelock), NOT a resume defect. WoWLAN-disabled +
+  interface up = policy -16 (EBUSY), not a wedge. Do NOT unload
+  `bcmdhd4398`. Full write-up: BRINGUP-LOG.md 2026-11-22 P1-P4 section.
+- Suspend workarounds: prevention (repowerd pre-suspend Wi-Fi quiesce)
+  + cure (post-resume health check -> NM restart). Design spec:
+  `husky-verify/repowerd-suspend-hooks-spec.md` (implementation pending
+  decision).
+- Known-good baseline facts: defect #1 bottom artifact RESOLVED
+  (mechanism UNKNOWN); defect #6 CLOSED; clean poweroff PASSED; defect
+  #8 OPEN (6/6 healthy cold-offs, no repro).
+- Communications state: SMS works only after defect #9's zero-byte
+  history DB recovery; first-boot init OPEN. MMS receive/display tested,
+  send untested. Airplane/hotspot defect #10 partial; NFC defect #11;
+  Bluetooth A2DP/reconnect/suspend pass, call audio untested; VoLTE
+  research only.
 - CLEAN-INSTALL CHECK: after the next clean flash, verify
-  `~/.local/share/history-service/history.sqlite` is non-zero and has the
-  expected schema before any SMS workaround; if 0-byte, capture first-boot
-  journal + history-daemon logs first.
-- Next discriminating action, pending explicit approval: P1 on the
-  known-good image — autosleep off, `nmcli networking off`, wait ~5s, then
-  one manual suspend / `rtcwake -m mem -s 20`; capture dmesg/journal. This
-  tests whether suspend enters cleanly when live Wi-Fi teardown is removed.
-  Do not unload bcmdhd4398. Only after the suspend-path result, schedule
-  #10, #11, remaining communications tests, VoLTE research, #7, and
-  patch-stack isolation separately.
+  `~/.local/share/history-service/history.sqlite` is non-zero with the
+  expected schema before any SMS workaround; if 0-byte, capture
+  first-boot journal + history-daemon logs first.
+- Next discriminating actions (no phone risk, in order): (1) implement
+  or schedule the repowerd suspend hooks per the spec; (2) remaining
+  comms queue: SMS first-boot init, MMS send, defect #10/#11, VoLTE
+  Register experiment; (3) audio defect #7 (needs the stable-image
+  binder work); (4) kernel patch-stack isolation bisect.

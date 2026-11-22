@@ -18,7 +18,6 @@ Tag `known-good-r8-20261110` identifies the three coordinated revisions listed i
 
 ## Immediate priorities
 
-1. Build and flash normal/debug variants from the cleaned device branch.
-2. Retest camera/SMS permissions now that AppArmor and Mir trust-store startup are fixed.
-3. Investigate the bottom-region framebuffer wrap using the four Lomiri flag combinations.
-4. Continue hardware validation in dependency order: UI/touch/backlight, power cycles, Wi-Fi/Bluetooth, audio, sensors, cellular, camera.
+1. Retest camera/SMS permissions now that AppArmor and Mir trust-store startup are fixed.
+2. Implement or schedule the repowerd suspend hooks (spec: `husky-verify/repowerd-suspend-hooks-spec.md`); the suspend track itself is CLOSED — defect #12 is reproducible on demand and recoverable via NM reset (BRINGUP-LOG 2026-11-22 P1-P4).
+3. Continue hardware validation in dependency order: UI/touch/backlight, power cycles, Wi-Fi/Bluetooth, audio, sensors, cellular, camera.

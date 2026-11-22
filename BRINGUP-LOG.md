@@ -817,3 +817,64 @@ off`), wait about five seconds, then perform one manual suspend or
 prediction is that removing live Wi-Fi teardown lets suspend enter
 cleanly; failure with a persistent `c-1 wl-1` lock would instead point
 at the autosleep retry path itself. Do not unload `bcmdhd4398`.
+
+
+## 2026-11-22 — P1–P4: suspend characterized end-to-end; defect #12 reproduced on demand + recovery found
+
+Four bounded on-device experiments on the known-good baseline (kver
+`g799ecb77416a`, slot `_b`; evidence roots `husky-verify/p{1..4}-suspend-20261122/`
+with REPORT.md files). SSH drops at suspend entry are expected (RNDIS
+rebind lag, ~30 s); uptime was continuous in all runs (no reboots).
+
+**P1 (TESTED) — teardown BEFORE suspend works.** `nmcli networking off`,
+~5 s settle, `rtcwake -m mem -s 20`: the dhd busy state `0x44` seen
+during teardown cleared in ~5 s, `PM: suspend entry (deep)` fired, RTC
+wake exactly 20 s, zero `-19`/trap/stuck-wakelock lines, Wi-Fi healthy
+after `nmcli networking on`. Verdict: the PM_AUTOSLEEP blocker was the
+teardown-DURING-suspend race (H1/H2 confirmed); a pre-suspend Wi-Fi
+quiesce hook makes manual suspend reliable.
+
+**P2 (TESTED) — armed suspend with Wi-Fi up survives short cycles.**
+Wi-Fi associated, baseline WoWLAN arm, `rtcwake -m mem -s 20`: suspend
+entered; a `pci_pm_suspend: State of device not saved by
+dhdpcie_pm_suspend` WARNING fired — this WARN only triggers on callback
+SUCCESS (the PCI core saves state itself), so it is benign. WoWLAN
+packets woke the phone at 2.2 s (LAN broadcast traffic through the
+baseline triggers); resume clean, driver healthy.
+
+**P3 (TESTED) — two mechanisms prevent long armed suspends.**
+(a) `iw phy0 wowlan disable` with the interface up makes
+`dhdpcie_pm_suspend` persistently return -16 (userspace sees EBUSY on
+`/sys/power/state`) even with clean `busy_state:0x0` — a driver policy
+refusal (no wake mechanism), NOT a wakelock wedge. (b) With WoWLAN armed
+on this LAN, every suspend aborts <1 s on `host_wake caused by packets`.
+Side finding: this driver rejects every per-trigger WoWLAN set via
+cfg80211 (EINVAL, interfaces up or down); only `any` is accepted, so the
+baseline 4-trigger arm is driver-internal and not user-reproducible.
+
+**P4 (TESTED) — defect #12 REPRODUCED with byte-identical signature.**
+A detached phone-side loop (`p4-loop.sh`, RTC-bounded `echo mem`
+attempts, wowlan=`any`, Wi-Fi up) caught a quiet window on cycle 3:
+genuine 33 s deep suspend, resume via rtc-alarm0, then `Dongle trap but
+no etd` and hang reason
+`Dongle_Trap_0x0_0x0_pciedev_host_wake_asserted_for_too_long+0x53` —
+identical to the 2026-11-21 classification. The `-19` wedge followed
+(SSSR dump ran; firmware stayed dead; NM stale "connected").
+
+**Established repro conditions for defect #12:** (1) WoWLAN armed
+(disabled -> policy -16, never sleeps); (2) a genuine deep suspend —
+clean at 2.2 s (P2), traps at 33 s (P4), threshold in between; (3) any
+resume source (RTC suffices; the 2026-11-21 wake source is not
+implicated).
+
+**Recovery (TESTED):** `nmcli networking off`, 8 s, `nmcli networking
+on` — the driver's own stop/start reset reloaded the firmware
+(`WLC_E_LINK UP` both interfaces, ping 0% loss), no module unload. This
+is exactly the recovery that did not run on 2026-11-21. Basis for a
+repowerd post-resume auto-heal hook (see
+`husky-verify/repowerd-suspend-hooks-spec.md`).
+
+Net: suspend/resume is workable today via prevention (pre-suspend
+quiesce) plus cure (post-resume NM reset if wedged). Real fixes remain
+firmware/driver-side. WoWLAN currently set to `any` (cosmetic; reverts
+on reboot). Do NOT unload `bcmdhd4398`.
