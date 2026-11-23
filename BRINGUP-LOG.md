@@ -1054,3 +1054,72 @@ instead). Fix direction: make the usbdp/ container USB-HAL path write
 RNDIS codes (or pin usb-moded as gadget owner). Wifi SSH
 (`root@<lan-ip>`, port 22 open) is the reliable fallback channel —
 used for the entire 2026-11-23 session after RNDIS broke.
+
+
+## 2026-11-23 (late) — Defect #16: composer identified (usbdp exonerated), pinned-composer fix integrated and validated
+
+### Replug experiment with traps armed (TESTED)
+
+Setup: 1 s gadget watcher (descriptors + function-dir mtime + UDC state →
+`/userdata/gadget-watch.log`), strace on usbdp_gbinder (PID 5556) and on the
+container `android.hardware.usb-service` (PID 4024). User cable replug while
+the gadget was owned by the ad-hoc `/userdata/husky-usb-diag` composer
+(2026-11-23 session leftover; `husky-usb-diag.service` with
+`Conflicts=usb-moded.service`; NOT part of the repo image).
+
+Result: **defect #16 did NOT reproduce.** UDC cycled
+`configured → not attached → configured`; descriptors never changed; the
+SSH session over RNDIS and the Windows adapter survived the replug.
+
+- **usbdp_gbinder EXONERATED** (2026-11-23 log's attribution RETRACTED):
+  the entire strace is `IUsbCallback.notifyPortStatusChange` callback
+  relaying — zero configfs access (the binary carries no configfs strings
+  either). It only logs callbacks to stdout.
+- Container `android.hardware.usb-service`: only reads typec/power sysfs.
+  No configfs path exists in the container.
+- usb-moded was INACTIVE this boot (diag `Conflicts=` pin) — yet the
+  gadget was fully composed, proving the diag script (not usb-moded)
+  composed it. The 2026-11-23 broken composition (rndis.usb0 +
+  mass_storage.usb0, ECM codes) matches **usb-moded's** composition shape;
+  usb-moded's replug recomposition is now the prime defect-#16 suspect —
+  INFERRED, not re-confirmed on a usb-moded-owned boot (would need a
+  diag-disabled reboot + replug; parked, low value).
+
+### Class-code matrix on Windows 11 host (TESTED, same device, same session)
+
+Composition (class/subclass/protocol) → Windows result:
+
+| Codes | os_desc RNDIS | Windows result |
+|---|---|---|
+| 02/06/00 (kernel default) | present | works only when the MS OS descriptor query is honored (adapter "Remote NDIS Compatible Device"); code 28 when it is not (the original defect) |
+| 02/02/ff | present | **usbser.inf wins** ("USB Serial Device COMx"); compatible IDs contained only `USB\Class_02&SubClass_02&Prot_ff` — `USB\MS_COMP_RNDIS` was never generated. os_desc matching is NOT reliable across re-enumerations |
+| **e0/01/03** (Android tethering) | present | **inbox match `USB\Class_E0&SubClass_01&Prot_03`** → "Remote NDIS based Internet Sharing Device", Up at 426 Mbps, no os_desc dependency |
+
+Validation of e0/01/03 + pinned composer: full cable replug survived
+(descriptors untouched, UDC reconfigured, adapter stays Up, SSH over RNDIS
+uninterrupted). Windows-side note: a newly-enumerated RNDIS devnode starts
+with APIPA; assign 10.15.19.83/24 to the new adapter (needs admin) or wait
+for the address from the usual host playbook.
+
+### Fix integrated (repo)
+
+`overlay-debug/system/usr/libexec/husky-rndis-rescue` +
+`husky-rndis-rescue.service` (`oneshot`, `RemainAfterExit=yes`,
+`Conflicts=usb-moded.service`, `Before=usb-moded.service`, WantedBy
+multi-user.target): composes g1 = RNDIS-only, idVendor 18d1, idProduct
+4ee3, os_desc MSFT100/RNDIS, **class codes e0/01/03**, binds UDC, sets
+usb0 = 10.15.19.82/24. Replaces the ad-hoc on-phone state with the same
+mechanism, now with validated descriptors. Debug images only (normal images
+have no rescue RNDIS path). `validate-overlay.sh` PASS; script smoke-tested
+live on device (composition correct after run).
+
+Phone-side interim state (until next flash): `/userdata/husky-usb-diag`
+updated in place to write e0/01/03 so an unexpected reboot keeps the
+validated composition. Post-flash cleanup: remove
+`/etc/systemd/system/husky-usb-diag.service` + `/userdata/husky-usb-diag*`
+(the integrated service supersedes them; both composers running would
+fight over descriptors — diag lacks the e0/01/03 writes).
+
+Defect #16: **CLOSED-WORKAROUND** (pending one validation on the integrated
+image: flash → boot → replug). Residual INFERRED item: usb-moded as the
+original replug-time recomposer.

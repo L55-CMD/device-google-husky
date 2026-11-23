@@ -109,10 +109,16 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   with 2026-11-22 manual quiesce+deep >33 s clean runs, the integrated
   workaround covers the characterized defect-#12 regime. Defect #12
   CLOSED-WORKAROUND; real fix remains firmware/driver-side.
-- Defect #16 (NEW, OPEN): USB gadget reconfigures to CDC-ECM descriptors
-  on cable replug (android USB-HAL relay via usbdp_gbinder) → Windows
-  RNDIS broken until reboot. Workaround: reboot, or live-fix subclass/
-  protocol + UDC rebind (TESTED); Wi-Fi SSH is the reliable channel.
+- Defect #16: **CLOSED-WORKAROUND** (flash-pending). Root cause refined
+  2026-11-23 (late): usbdp_gbinder EXONERATED (strace: pure IUsbCallback
+  relay, no configfs access); usb-moded's replug recomposition is the
+  prime suspect (INFERRED). Fix integrated: `husky-rndis-rescue`
+  (overlay-debug) pins a custom RNDIS composer (Conflicts=usb-moded),
+  writes Android-tethering class codes e0/01/03 (inbox Windows rndismp
+  match, no os_desc dependency; 02/02/ff fell back to usbser, 02/06/00
+  is the original broken ECM state). Validated live: replug survives,
+  SSH/adapter uninterrupted. Pending: same validation on the flashed
+  integrated image; post-flash remove ad-hoc /userdata/husky-usb-diag*.
 - Harness fixes (2026-11-23, `husky-verify/quiesce-validation.sh` only):
   sorted Wi-Fi-scoped state comparator (nmcli order + mid-run gsm
   registration false-failed); trap regex now `Dongle trap|
@@ -138,6 +144,6 @@ LTO_NONE fragment stays because it is part of the validated source tree.
   (repowerd libsuspend path — hooks do NOT run on autosleep; decide per
   spec step 4); (2) opportunistic hook-path >33 s deep window (waker-
   dependent); (3) SMS end-to-end + MMS with user, defect #10/#11, audio
-  defect #7; (4) defect #16 gadget-owner fix; (5) kernel patch-stack
-  isolation bisect; (6) r12 freeze bisect before any kernel-foundation
-  move.
+  defect #7; (4) defect #16 flashed-image validation + ad-hoc diag
+  cleanup; (5) kernel patch-stack isolation bisect; (6) r12 freeze
+  bisect before any kernel-foundation move.

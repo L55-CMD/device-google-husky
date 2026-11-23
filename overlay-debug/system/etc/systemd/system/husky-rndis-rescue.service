@@ -1,0 +1,16 @@
+[Unit]
+Description=Husky pinned RNDIS rescue gadget (debug, defect #16 workaround)
+Wants=sys-kernel-config.mount
+After=sys-kernel-config.mount
+# Pin gadget ownership: never let usb-moded take over and recompose the
+# gadget on cable replug (that recomposition is defect #16's trigger).
+Conflicts=usb-moded.service
+Before=usb-moded.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/husky-rndis-rescue
+
+[Install]
+WantedBy=multi-user.target

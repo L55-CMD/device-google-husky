@@ -30,8 +30,9 @@ freeze has been bisected and repeatedly boot-tested.
    (NM-level AP works, Lomiri UI path broken), GPS defect #13 (provider
    backend needed), defect #10 (airplane/hotspot), #11 (NFC tag), wireless
    charging, USB-C DP, fingerprint.
-3. Defect #16: USB gadget reconfigures to CDC-ECM on cable replug (Windows
-   RNDIS breaks until reboot). Workaround: reboot / live-fix descriptors /
-   use Wi-Fi SSH.
+3. Defect #16: CLOSED-WORKAROUND. Fix integrated in overlay-debug
+   (`husky-rndis-rescue`, pinned composer + e0/01/03 codes); validated
+   live incl. replug. Remaining: validate on flashed image, then remove
+   the ad-hoc `/userdata/husky-usb-diag*` on the phone.
 4. Camera/SMS permission re-test from a clean flash (with the history DB
    check) when the next clean flash happens.

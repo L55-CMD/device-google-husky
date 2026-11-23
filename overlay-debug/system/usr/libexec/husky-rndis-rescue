@@ -1,0 +1,99 @@
+#!/bin/sh
+# Husky debug image only: pin the configfs USB gadget to a single RNDIS
+# rescue composition, and keep usb-moded out of gadget ownership
+# (Conflicts=usb-moded.service on the calling unit).
+#
+# Defect #16 (2026-11-23): with usb-moded owning the gadget, a cable replug
+# while running recomposed the rndis control interface with kernel-default
+# CDC-ECM codes (class 02 subclass 06 protocol 00). Windows has no inbox
+# ECM driver, so RNDIS stayed broken (devnode code 28) until reboot.
+#
+# Evidence (2026-11-23 evening replug experiment, ad-hoc predecessor of this
+# script as composer): UDC cycled configured -> not attached -> configured,
+# descriptors never changed, the SSH session over RNDIS and the Windows
+# "Remote NDIS Compatible Device" adapter both survived the replug. strace
+# during the replug showed usbdp_gbinder only relaying
+# IUsbCallback.notifyPortStatusChange (no configfs access at all) and the
+# container android.hardware.usb-service only reading typec sysfs. The
+# 2026-11-23 log's attribution of the ECM recomposition to usbdp_gbinder is
+# therefore RETRACTED; usb-moded's own replug recomposition is the remaining
+# suspect (INFERRED, not re-confirmed on a usb-moded-owned boot).
+#
+# Class-code selection (TESTED 2026-11-23, all on this device + Windows 11
+# host):
+#   02/06/00 (kernel default)   -> Windows devnode code 28 when the MS OS
+#                                  descriptor query is not honored (the
+#                                  original defect).
+#   02/02/ff + os_desc RNDIS    -> fell back to usbser.inf ("USB Serial
+#                                  Device COMx") on re-enumeration: Windows
+#                                  generated only
+#                                  USB\Class_02&SubClass_02&Prot_ff and
+#                                  never USB\MS_COMP_RNDIS. The os_desc path
+#                                  is NOT reliable across re-enumerations.
+#   e0/01/03 (Android tethering)-> inbox match USB\Class_E0&SubClass_01&
+#                                  Prot_03, "Remote NDIS based Internet
+#                                  Sharing Device", no os_desc dependency.
+#                                  Full cable replug survived: descriptors
+#                                  untouched, adapter stays up, SSH over
+#                                  RNDIS uninterrupted.
+# So this script writes e0/01/03. The MS OS 1.0 wiring below is kept as a
+# secondary path only. Debug images only; normal images have no rescue
+# RNDIS path (see overlay-debug/system/etc/default/usb-moded.d/).
+set -eu
+
+G=/sys/kernel/config/usb_gadget/g1
+F="$G/functions/rndis.usb0"
+
+# Wait for a UDC (mirrors the boot-time UDC presence check in
+# ramdisk-overlay/scripts/halium). g1 itself is created by mkdir below.
+i=0
+while [ "$i" -lt 50 ]; do
+    UDC="$(ls -1 /sys/class/udc 2>/dev/null | head -n 1 || true)"
+    [ -n "$UDC" ] && break
+    sleep 0.2
+    i=$((i + 1))
+done
+[ -n "$UDC" ]
+
+# Unbind before (re)composing; harmless when already unbound.
+if [ -s "$G/UDC" ]; then
+    echo "" > "$G/UDC" || true
+fi
+
+mkdir -p "$G/strings/0x409" \
+         "$G/configs/c.1/strings/0x409" \
+         "$F"
+
+# Drop any previously linked functions, then link ours.
+for f in "$G/configs/c.1/"*; do
+    if [ -L "$f" ]; then
+        rm -f "$f"
+    fi
+done
+
+echo 0x18d1 > "$G/idVendor"
+echo 0x4ee3 > "$G/idProduct"
+echo husky-rndis-rescue > "$G/strings/0x409/serialnumber"
+echo "Ubuntu Touch husky (debug)" > "$G/strings/0x409/manufacturer"
+echo "Husky RNDIS rescue" > "$G/strings/0x409/product"
+echo rndis > "$G/configs/c.1/strings/0x409/configuration"
+
+# MS OS 1.0 descriptors: make Windows bind RNDIS even with ECM class codes.
+echo 1 > "$G/os_desc/use"
+echo 0x1 > "$G/os_desc/b_vendor_code"
+echo MSFT100 > "$G/os_desc/qw_sign"
+echo RNDIS > "$F/os_desc/interface.rndis/compatible_id"
+echo 5162001 > "$F/os_desc/interface.rndis/sub_compatible_id"
+
+# Android-tethering RNDIS class codes e0/01/03: matched by Windows' inbox
+# rndismp driver without any OS-descriptor dependency (defect #16: the
+# kernel default 02/06/00 exposes CDC-ECM, which Windows cannot bind).
+echo e0 > "$F/class"
+echo 01 > "$F/subclass"
+echo 03 > "$F/protocol"
+
+ln -sfn "$F" "$G/configs/c.1/rndis.usb0"
+echo "$UDC" > "$G/UDC"
+
+ip link set usb0 up
+ip addr replace 10.15.19.82/24 dev usb0
