@@ -974,3 +974,83 @@ fingerprint.
   (Change 2, `ee64390`), deep-suspend race-window method validated
   (clean 3.6-55.3 s deep suspends, zero defect-#12 signatures with
   teardown-first). See the earlier 2026-11-22 sections.
+
+
+## 2026-11-23 — Hook image ee64390 flashed; logind-path validation 11/11 clean; defect #12 workaround validated (combined); defect #16 found (USB gadget reconfigures to ECM on replug)
+
+### Flash (TESTED)
+
+Device CI run `45061652269` (branch `test-audio-restore` @ `ee64390`,
+kernel patches `22c33ed`, manifest `a979a7a`, same kver `g799ecb77416a`
+as known-good — ramdisk/overlay-only delta). Offline
+`verify-integration.sh` PASS (IKCONFIG CLANG_THIN matches run-98
+reference; matched image set; same-run provenance). Flashed to slot `_b`
+via `dd` (5 images, on-phone sha256 match), one reboot. Phone healthy
+after boot: container/NM/repowerd active, Wi-Fi ×2 connected, Vodafone
+gsm registered (registration completes ~1-2 min after boot —
+observation, not a defect).
+
+### Hook-path validation (TESTED) — `quiesce-validation.sh` on device
+
+Two full runs of the staged plan (stage-0 logind-path proof + 5, then 4,
+RTC-bounded deep cycles; evidence `husky-verify/quiesce-validation-20261123/`):
+
+- **Run A: stage0 + 5/5 PASS. Run B: stage0 (1 env-abort retry) + 4/4
+  PASS. Total 11/11 hook-path suspends clean.**
+- Every cycle: pre-hook snapshot → active teardown (`nmcli networking
+  off`) → handoff to suspend in ~10 s → **deep entry confirmed in dmesg
+  every cycle** → clean resume → post-hook restore per snapshot → Wi-Fi
+  device state and connections match pre-suspend (sorted Wi-Fi-scoped
+  comparator). suspend_stats: 17 success, **0 dhd failures**.
+- Real suspend windows: 1.1-28.9 s (max 28.9 s ×2, RTC wake). **No >33 s
+  window landed on the hook path this session** — early wakes came from
+  the environmental waker family (`cp2ap_wakeup` modem ×3, plus
+  `alarmtimer.3.auto` entry aborts on 3 attempts, all retried/ recovered).
+  This is the parked waker-hunt phenomenon (quiet-LAN dependent), NOT a
+  dhd defect: last_failed_dev is the alarmtimer, never `0001:01:00.0`.
+- Zero genuine defect-#12 signatures in any cycle (no Dongle trap, no
+  `host_wake_asserted`, no `-19` wedge).
+
+**Verdict: defect #12 workaround (pre-suspend quiesce + post-resume
+auto-heal, shipped `9f8e84c`+`ee64390`) is VALIDATED on the production
+logind path.** Combined with 2026-11-22 manual quiesce+deep evidence
+(clean 40.7/52/55.3 s deep suspends, zero signatures), the integrated
+workaround covers the characterized defect-#12 window. Residual gap
+(recorded, not blocking): a >33 s deep window ON THE HOOK PATH itself
+has not landed (28.9 s max; waker-dependent, opportunistic). Real fix
+remains firmware/driver-side; defect #12 stays CLOSED-WORKAROUND.
+
+### Harness lessons (evidence hygiene; scripts in `husky-verify/`, NOT product)
+
+Three false-stops in the validation harness, all corrected in-script
+with evidence comments: (1) raw `diff` state comparator false-FAILED on
+nmcli ordering + mid-run **gsm registration** (cellular is not this
+validation's variable) → sorted Wi-Fi-scoped comparator; (2) bare
+`wakelock c-1 wl-1` false-TRAPPED a healthy cycle (short self-limiting
+bursts, no `Suspend failed`, fail-stat clean — distinct from P4's
+paired `Suspend failed because of wakelock` + Dongle trap) → signature
+removed; (3) `Suspend failed because of wakelock` false-TRAPPED on a
+**dhd runtime-PM line while awake** (Wi-Fi reconnect churn; benign) →
+removed; the dhd suspend-ENTRY race keeps its own authority: suspend
+fail-stat with `last_failed_dev=0001:01:00.0`. Environmental entry
+aborts (alarmtimer) are retried, never passes.
+
+### Defect #16 (NEW, OPEN) — USB gadget reconfigures to ECM descriptors on cable replug; Windows RNDIS breaks until reboot
+
+Evidence (2026-11-23): after a cable replug while running, the phone's
+configfs gadget (`/sys/kernel/config/usb_gadget/g1`, functions
+`rndis.usb0`+`mass_storage.usb0`) was re-composed by the android USB
+HAL relay (`usbdp_gbinder`, `notifyPortStatusChange` at re-plug time)
+with the control interface written as **CDC-ECM** (`class 02 subclass
+06 protocol 00`) instead of RNDIS (`02/02/ff`). Windows has no inbox ECM
+driver → devnode code 28, no network adapter; reboot is unaffected
+(cold-boot usb-moded rescue `-r` writes a working RNDIS composition).
+INFERRED trigger: any port-status change while running (replug, and
+possibly suspend-resume USB renegotiation). Workaround: reboot the
+phone (or live-fix: `echo 02 > .../rndis.usb0/subclass`, `echo ff >
+.../rndis.usb0/protocol`, rebind UDC — TESTED 2026-11-23: Windows then
+binds; note `protocol 00` makes Windows see a plain CDC-ACM serial
+instead). Fix direction: make the usbdp/ container USB-HAL path write
+RNDIS codes (or pin usb-moded as gadget owner). Wifi SSH
+(`root@<lan-ip>`, port 22 open) is the reliable fallback channel —
+used for the entire 2026-11-23 session after RNDIS broke.

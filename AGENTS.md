@@ -92,52 +92,52 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-22
+2026-11-23
 
-- Canonical device docs branch: `test-audio-restore`; device integration
-  branch `main`: `24d9591`; manifest `main`: `dd6cdda`; patches `main`:
-  `22c33ed` (all CI-green). PHONE: known-good matched debug boot set
-  (kver `g799ecb77416a`, slot `_b`), healthy, uptime continuous.
-- SUSPEND TRACK: characterization complete (P1-P4, TESTED 2026-11-22,
-  evidence husky-verify/p{1..4}-suspend-20261122/), but defect #12
-  remains OPEN until a workaround/fix is integrated and validated.
-  Bracket, not threshold: armed deep suspend failed at 33 s (RTC resume;
-  hang reason identical to 2026-11-21), passed at 2.2 s; 'any resume
-  source' NOT proven (RTC only); WoWLAN-disabled untestable (policy -16
-  blocks suspend). P1 strongly supports the teardown-race diagnosis and
-  validates quiescing as a workaround, but is not universal proof alone.
-  Do NOT unload `bcmdhd4398`. Staged plan: quiesce hook -> >33 s deep-
-  suspend validation -> PM_AUTOSLEEP increment -> auto-heal (separate) ->
-  comms. Spec: husky-verify/repowerd-suspend-hooks-spec.md.
-- Suspend hooks: pre-suspend quiesce shipped in overlay-debug (quiesce
-  ONLY; auto-heal intentionally deferred to a separate change after
-  quiesce validation). Runtime install impossible (RO rootfs). Staged
-  validation: deep suspends >33 s with quiesce hook, then PM_AUTOSLEEP
-  increment, then auto-heal. Spec: husky-verify/repowerd-suspend-hooks-
-  spec.md.
+- PHONE: `test-audio-restore` debug @ `ee64390` (CI run 45061652269,
+  kver `g799ecb77416a`, slot `_b`), flashed+validated today; healthy —
+  Wi-Fi ×2, Vodafone gsm, container/NM/repowerd active. Evidence of the
+  day: `husky-verify/quiesce-validation-20261123/`.
+- SUSPEND TRACK: **defect #12 workaround VALIDATED** — quiesce hook +
+  auto-heal (shipped `9f8e84c`+`ee64390`) ran clean on the production
+  logind path: 11/11 suspends (two full validation runs), deep entry
+  every cycle, state restored every cycle, zero genuine signatures,
+  0 dhd suspend failures (stats 17 ok / 6 env-abort fails, all
+  alarmtimer-class, retried). Max hook-path window 28.9 s ×2; >33 s on
+  the hook path itself not yet landed (waker-dependent: cp2ap modem +
+  alarmtimer aborts — the parked waker-hunt family, NOT dhd). Combined
+  with 2026-11-22 manual quiesce+deep >33 s clean runs, the integrated
+  workaround covers the characterized defect-#12 regime. Defect #12
+  CLOSED-WORKAROUND; real fix remains firmware/driver-side.
+- Defect #16 (NEW, OPEN): USB gadget reconfigures to CDC-ECM descriptors
+  on cable replug (android USB-HAL relay via usbdp_gbinder) → Windows
+  RNDIS broken until reboot. Workaround: reboot, or live-fix subclass/
+  protocol + UDC rebind (TESTED); Wi-Fi SSH is the reliable channel.
+- Harness fixes (2026-11-23, `husky-verify/quiesce-validation.sh` only):
+  sorted Wi-Fi-scoped state comparator (nmcli order + mid-run gsm
+  registration false-failed); trap regex now `Dongle trap|
+  host_wake_asserted|error -19` only (`wakelock c-1 wl-1` and
+  `Suspend failed because of wakelock` are benign-while-awake patterns);
+  dhd entry race authority = fail-stat `last_failed_dev=0001:01:00.0`;
+  environmental alarmtimer aborts retried (stage0 ×3).
 - Known-good baseline facts: defect #1 bottom artifact RESOLVED
   (mechanism UNKNOWN); defect #6 CLOSED; clean poweroff PASSED; defect
-  #8 OPEN (6/6 healthy cold-offs, no repro).
-- Communications state: SIM-dislodgement incident 2026-11-21 23:33Z ->
-  baseband reported SIM ABSENT (looked like a radio regression; evidence
-  husky-verify/comms-20261122-radio-regression/) -> RESOLVED 2026-11-22
-  by user SIM reseat (hot-detect): full stack recovered, SMS reception
-  confirmed, mobile data active. The vendor.google.radioext crash-loop
-  was collateral of the SIM-less state and self-resolved. VoLTE TESTED:
-  ofono IpMultimediaSystem.Register returns Failed locally (no SIT
-  traffic); modem reports VoLTE Available=1, so the gap is the
-  ofono<->SIT-RIL path — VoLTE parked as research (driver work needed).
-  Remaining comms queue: SMS end-to-end with user, MMS send, defect #10
-  (airplane/hotspot), #11 (NFC), first-boot history DB check on clean
-  flash (defect #9 follow-up).
-- CLEAN-INSTALL CHECK: after the next clean flash, verify
-  `~/.local/share/history-service/history.sqlite` is non-zero with the
-  expected schema before any SMS workaround; if 0-byte, capture
-  first-boot journal + history-daemon logs first.
-- Next discriminating actions (in order): (1) flash the quiesce-hook
-  debug image (approval) and validate repeated genuine deep suspends
-  >33 s (clean resume, correct network restoration); (2) re-test with
-  PM_AUTOSLEEP incrementally; (3) implement post-resume auto-heal as a
-  separate change; (4) only then: SMS end-to-end + MMS send with user,
-  defect #10/#11, audio defect #7; (5) kernel patch-stack isolation
-  bisect; (6) r12 freeze bisect before any kernel-foundation move.
+  #8 OPEN (6/6 healthy cold-offs, no repro); defect #4 closed
+  (2026-11-22, mechanism unknown).
+- Comms state (2026-11-22 user tests): SMS/MMS send+receive WORKS, call
+  audio bidirectional WORKS (defect #2 closure candidate), mobile data
+  active, VoLTE parked (ofono<->SIT-RIL gap). Fails: hotspot from Lomiri
+  UI (#8; NM-level AP works), GPS (#13, root-caused: lomiri-location-
+  service SEGVs — no UAL lib, no provider config). Auto-brightness:
+  no backend on image (sensorfw ALS + consumer needed). Untested:
+  wireless charging, NFC tag, USB-C DP, fingerprint.
+- CLEAN-INSTALL CHECK still pending on next clean flash: verify
+  `~/.local/share/history-service/history.sqlite` non-zero with expected
+  schema before any SMS workaround.
+- Next discriminating actions (in order): (1) PM_AUTOSLEEP increment
+  (repowerd libsuspend path — hooks do NOT run on autosleep; decide per
+  spec step 4); (2) opportunistic hook-path >33 s deep window (waker-
+  dependent); (3) SMS end-to-end + MMS with user, defect #10/#11, audio
+  defect #7; (4) defect #16 gadget-owner fix; (5) kernel patch-stack
+  isolation bisect; (6) r12 freeze bisect before any kernel-foundation
+  move.
