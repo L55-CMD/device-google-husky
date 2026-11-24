@@ -1,0 +1,87 @@
+#!/bin/bash
+# 00-husky-bt-quiesce — systemd sleep hook (pre AND post)
+# 2026-11-24: stop the android container's bcmbtlinux before suspend.
+# Mechanism (husky-verify/bt-hostwake-20261124/): bcmbtlinux (sole holder of
+# /proc/bluetooth/sleep/btwrite) writes a final BT UART transaction at host
+# suspend time; its bt_host_wake edge races the nitrous IRQ arming and aborts
+# the suspend in ~0.5 s. Stopping bcmbtlinux pre-suspend removes the
+# transaction; validated on-device: 49/12.6/15/26 s deep suspends with BT on,
+# zero bt_host_wake, woken only by the environmental family (cp2ap/rtc/PMIC).
+# State-preserving: snapshot the BlueZ adapter power state; a bcmbtlinux
+# start powers the adapter on as a side effect, so restore the initial state
+# post-resume. Only restart bcmbtlinux if THIS hook stopped it. Bounded, no
+# retry loop, exit 0 always. Wi-Fi quiesce/auto-heal are unaffected.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+TAG="husky-bt-hook"
+STATE=/run/husky-bt-pre-state
+LB=/dev/logbuffer_btlpm
+log() { echo "$TAG[$1] $2"; logger -t "$TAG" "$1: $2"; }
+
+bt_svc_pid() { pgrep -f "vendor/bin/hw/android.hardware.bluetooth-service.bcmbtlinux" | head -1; }
+
+case "$1" in
+pre)
+    log pre "start $(date -u +%FT%H:%M:%SZ)"
+    mkdir -p /run
+    # snapshot: BlueZ adapter power state + whether we stop the service
+    if bluetoothctl show 2>/dev/null | grep -q "Powered: yes"; then
+        echo "adapter=on" > "$STATE"
+    else
+        echo "adapter=off" > "$STATE"
+    fi
+    if [ -n "$(bt_svc_pid)" ]; then
+        echo "svc_stopped=1" >> "$STATE"
+    else
+        echo "svc_stopped=0" >> "$STATE"
+    fi
+    log pre "snapshot: $(tr '\n' ' ' < $STATE)"
+
+    if [ "$(grep -o 'svc_stopped=.*' "$STATE" | cut -d= -f2)" != "1" ]; then
+        log pre "bcmbtlinux not running; nothing to quiesce"
+        exit 0
+    fi
+    log pre "stopping bcmbtlinux (pid $(bt_svc_pid))"
+    lxc-attach -n android -- stop bcmbtlinux 2>/dev/null
+    sleep 3
+    [ -n "$(bt_svc_pid)" ] && log pre "WARN: bcmbtlinux still running after stop; continuing anyway"
+
+    # bounded wait for controller traffic to stop (3 s quiet streak, max 15 s)
+    last=$(cat $LB 2>/dev/null | wc -l); quiet=0; i=0
+    while [ $i -lt 15 ]; do
+        sleep 1; i=$((i+1))
+        now=$(cat $LB 2>/dev/null | wc -l)
+        if [ "$now" = "$last" ]; then quiet=$((quiet+1)); else quiet=0; last=$now; fi
+        [ $quiet -ge 3 ] && break
+    done
+    log pre "traffic-quiet after ${i}s (streak ${quiet}s); handing to suspend $(date -u +%FT%H:%M:%SZ)"
+    exit 0
+    ;;
+post)
+    log post "start $(date -u +%FT%H:%M:%SZ)"
+    if [ -f "$STATE" ]; then
+        # restart bcmbtlinux only if THIS hook stopped it
+        if [ "$(grep -o 'svc_stopped=.*' "$STATE" | cut -d= -f2)" = "1" ] && [ -z "$(bt_svc_pid)" ]; then
+            log post "restarting bcmbtlinux"
+            lxc-attach -n android -- start bcmbtlinux 2>/dev/null
+            sleep 5
+        fi
+        # restore the adapter to its INITIAL state (a bcmbtlinux start powers it on)
+        want=$(grep -o 'adapter=.*' "$STATE" | cut -d= -f2)
+        if bluetoothctl show 2>/dev/null | grep -q "Powered: yes"; then now=on; else now=off; fi
+        if [ "$want" = "off" ] && [ "$now" = "on" ]; then
+            bluetoothctl power off 2>/dev/null; log post "restored adapter=off per snapshot"
+        elif [ "$want" = "on" ] && [ "$now" = "off" ]; then
+            bluetoothctl power on 2>/dev/null; log post "restored adapter=on per snapshot"
+        else
+            log post "adapter already $now (initial state)"
+        fi
+        rm -f "$STATE"
+    else
+        log post "no snapshot; leaving state untouched"
+    fi
+    exit 0
+    ;;
+*)
+    exit 0
+    ;;
+esac

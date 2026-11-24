@@ -1123,3 +1123,84 @@ fight over descriptors — diag lacks the e0/01/03 writes).
 Defect #16: **CLOSED-WORKAROUND** (pending one validation on the integrated
 image: flash → boot → replug). Residual INFERRED item: usb-moded as the
 original replug-time recomposer.
+
+
+## 2026-11-24 — d4c88d4 flashed; defect #16 CLOSED; BT host-wake root-caused and quiesce validated; defect #12 stays OPEN
+
+### Flash + defect #16 closure (TESTED)
+
+- Flashed the `d4c88d4` debug set (kver `g799ecb77416a`, slot `_b`) via
+  the corrected rootfs path: extract `system_a` from the CI super
+  (`husky-verify/lp-extract.py`), dd into `/dev/mapper/system_a` live
+  (ro rootfs), forced reboot. The earlier "initrd reflashes from
+  /userdata/system_a.img" note was WRONG — the halium initrd only
+  dm-maps the on-device super; `/userdata/system_a.img` is a staging
+  copy. `/etc/systemd/system` is a persistent bind from
+  `/userdata/system-data/etc/systemd/system` (units survive reflashes).
+- Defect #16 replug test PASSED on the integrated image: dwc3 role
+  cycled, configfs descriptors stayed e0/01/03, Windows adapter
+  re-enumerated Up 426 Mbps, RNDIS SSH verified. Interim
+  `/userdata/husky-usb-diag*` removed after the pass; the integrated
+  `husky-rndis-rescue` alone composes the gadget at boot. **Defect #16
+  CLOSED.** Evidence: `husky-verify/idle-suspend-20261124/replug-test-20261124.log`.
+- Packaging fix `f7ead41`: the CI image had shipped the system-sleep
+  hooks non-executable (100644; systemd-sleep ignores them). Fixed to
+  100755 in git; the earlier 11/11 validation had only worked because of
+  a manual 0755 injection.
+
+### PM_AUTOSLEEP parked (project decision)
+
+Overnight soak on the PM kernel: zero successful suspends, 52,969
+recorded failures; sampled failures at freeze with `-EBUSY` while the
+dhd `wl-1` wakelock was held (cause not established for every historical
+failure). The autosleep path has no Wi-Fi-quiesce mechanism
+(systemd-sleep hooks do not run on it). PARKED by project decision; no
+autosleep-path quiesce to be built; autosleep disarmed. Evidence:
+`husky-verify/pm-autosleep-20261123/`. repowerd on the non-PM kernel
+uses the logind path (Libsuspend init fails, `LogindSystemPowerControl`
+selected). Incoming-call wake and BT regression tests transferred to the
+logind track.
+
+### Defect #12 status (precise wording)
+
+The failure signature is reproduced and the quiesce/auto-heal
+workarounds are validated on the recorded logind paths (11/11 manual
+2026-11-23; automatic repowerd path 2026-11-24,
+`husky-verify/idle-suspend-20261124`). The trap is associated with the
+Broadcom firmware/driver resume path, but the underlying mechanism
+remains UNKNOWN; P4 established a 33-second reproduction, not a
+universal duration threshold. **Defect #12 stays OPEN** (2026-11-24
+decision); the workaround does not close it.
+
+### BT host-wake: root cause and validated quiesce (TESTED)
+
+- Symptom: every BT-on deep suspend woke in ~0.5 s. Wake source
+  `bt_host_wake` (IRQ 514, gpn6-0 "odm:btbcm") + AOC mailbox (IRQ 423).
+- Isolation (`husky-verify/bt-hostwake-20261124/`): stock zuma DTS +
+  nitrous driver are correct (host-wake active-high edge; driver
+  deasserts DEV_WAKE then `enable_irq_wake` at suspend). No runtime IRQ
+  wake-arming mask exists (gpn6 has no set_wake;
+  `/sys/kernel/irq/N/wakeup` read-only). The nitrous logbuffer
+  (`/dev/logbuffer_btlpm`) showed a BT UART transaction IN FLIGHT at
+  suspend entry; the writer is the container's `bcmbtlinux` (sole
+  `/proc/bluetooth/sleep/btwrite` holder). BlueZ adapter power-off does
+  NOT prevent it (E1); there is no background traffic (45 s idle watch);
+  the transaction is suspend-triggered.
+- Quiesce VALIDATED: stop `bcmbtlinux` pre-suspend, restart post-resume,
+  preserving the BlueZ adapter's initial state (a `bcmbtlinux` start
+  powers the adapter on as a side effect — caught and fixed). Four deep
+  suspends with BT on: 49.4/12.6/~15/~26 s, all woken by the
+  environmental family (cp2ap/rtc-alarm0/s2mpg14), ZERO bt_host_wake.
+  Earbud reconnect + A2DP user-confirmed. Wi-Fi hooks unchanged; zero
+  defect-#12 signatures.
+- Integrated as `00-husky-bt-quiesce` (overlay-debug) alongside the
+  unchanged Wi-Fi quiesce/auto-heal — pending flash.
+- Remaining limiter: environmental wakers (12–49 s). Measure unattended
+  cycles before choosing an aggressive auto-suspend timeout; the
+  persistent default is a SEPARATE later change.
+
+### New tools
+
+- `husky-verify/lp-extract.py` — liblp (super) logical-partition
+  extractor (header magic 0x414c5030; 52 B partition / 24 B extent
+  entries).

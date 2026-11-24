@@ -92,33 +92,39 @@ known-good image set; its beneficial source delta is UNIDENTIFIED. The
 LTO_NONE fragment stays because it is part of the validated source tree.
 
 ## Current state
-2026-11-23
+2026-11-24
 
-- PHONE: `test-audio-restore` debug @ `ee64390` (CI run 45061652269,
-  kver `g799ecb77416a`, slot `_b`), flashed+validated today; healthy —
-  Wi-Fi ×2, Vodafone gsm, container/NM/repowerd active. Evidence of the
-  day: `husky-verify/quiesce-validation-20261123/`.
-- SUSPEND TRACK: **defect #12 workaround VALIDATED** — quiesce hook +
-  auto-heal (shipped `9f8e84c`+`ee64390`) ran clean on the production
-  logind path: 11/11 suspends (two full validation runs), deep entry
-  every cycle, state restored every cycle, zero genuine signatures,
-  0 dhd suspend failures (stats 17 ok / 6 env-abort fails, all
-  alarmtimer-class, retried). Max hook-path window 28.9 s ×2; >33 s on
-  the hook path itself not yet landed (waker-dependent: cp2ap modem +
-  alarmtimer aborts — the parked waker-hunt family, NOT dhd). Combined
-  with 2026-11-22 manual quiesce+deep >33 s clean runs, the integrated
-  workaround covers the characterized defect-#12 regime. Defect #12
-  CLOSED-WORKAROUND; real fix remains firmware/driver-side.
-- Defect #16: **CLOSED-WORKAROUND** (flash-pending). Root cause refined
-  2026-11-23 (late): usbdp_gbinder EXONERATED (strace: pure IUsbCallback
-  relay, no configfs access); usb-moded's replug recomposition is the
-  prime suspect (INFERRED). Fix integrated: `husky-rndis-rescue`
-  (overlay-debug) pins a custom RNDIS composer (Conflicts=usb-moded),
-  writes Android-tethering class codes e0/01/03 (inbox Windows rndismp
-  match, no os_desc dependency; 02/02/ff fell back to usbser, 02/06/00
-  is the original broken ECM state). Validated live: replug survives,
-  SSH/adapter uninterrupted. Pending: same validation on the flashed
-  integrated image; post-flash remove ad-hoc /userdata/husky-usb-diag*.
+- PHONE: `test-audio-restore` debug @ `d4c88d4` (kver `g799ecb77416a`,
+  slot `_b`) + live 0755 hook fix (`f7ead41` makes it permanent);
+  healthy — Wi-Fi ×2, Vodafone gsm, container/NM/repowerd active, BT on.
+- SUSPEND TRACK: defect #12 workaround (quiesce hook + auto-heal,
+  `9f8e84c`+`ee64390`) VALIDATED on the recorded logind paths (11/11 on
+  2026-11-23, `quiesce-validation-20261123`; automatic repowerd path
+  2026-11-24, `idle-suspend-20261124`). The trap is associated with the
+  Broadcom firmware/driver resume path but the underlying mechanism
+  remains UNKNOWN (P4 = a 33 s reproduction, not a universal threshold).
+  **Defect #12 stays OPEN** (2026-11-24 decision); the workaround does
+  not close it. PM_AUTOSLEEP PARKED (0/52,969 overnight; no
+  autosleep-path quiesce to be built). repowerd uses the logind path on
+  the non-PM kernel; auto-suspend never fires stock (default timeout
+  infinite — a persistent default is pending, deliberately AFTER the BT
+  quiesce ships).
+- BT host-wake (2026-11-24): instant ~0.5 s wake at every BT-on suspend
+  = a suspend-entry BT UART transaction from the container's
+  `bcmbtlinux` (sole `/proc/bluetooth/sleep/btwrite` holder) racing the
+  nitrous IRQ arming. Stock DTS/driver correct; no runtime IRQ
+  wake-arming mask exists. Quiesce VALIDATED: stop `bcmbtlinux`
+  pre-suspend + restart post-resume (adapter state preserved) → deep
+  suspends of 49/12.6/15/26 s, zero bt_host_wake, earbuds/A2DP OK
+  (`husky-verify/bt-hostwake-20261124/`). Integrated as
+  `00-husky-bt-quiesce` (overlay-debug) — pending flash. Sleep is now
+  bounded by the environmental wakers (cp2ap/rtc/PMIC, 12–49 s).
+- Defect #16: **CLOSED** (2026-11-24). `husky-rndis-rescue` (overlay-debug,
+  pinned composer, e0/01/03) flashed in the `d4c88d4` image and validated
+  by physical replug: descriptors unchanged, Windows adapter re-enumerated
+  Up 426 Mbps, RNDIS SSH verified; interim `/userdata/husky-usb-diag*`
+  removed after the pass. usb-moded remains the INFERRED original
+  replug-time recomposer (parked).
 - Harness fixes (2026-11-23, `husky-verify/quiesce-validation.sh` only):
   sorted Wi-Fi-scoped state comparator (nmcli order + mid-run gsm
   registration false-failed); trap regex now `Dongle trap|
