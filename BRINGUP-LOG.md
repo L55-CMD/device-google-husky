@@ -1204,3 +1204,48 @@ decision); the workaround does not close it.
 - `husky-verify/lp-extract.py` — liblp (super) logical-partition
   extractor (header magic 0x414c5030; 52 B partition / 24 B extent
   entries).
+
+## 2026-11-25 — Defect #10 root-caused + fixed (urfkill boot race); hotspot re-test on current image
+
+**Defect #10 (airplane/flight-mode UI) — ROOT CAUSE + FIX, validated.**
+urfkilld starts at ~12 s into boot, BEFORE /dev/rfkill and the rfkill
+switches exist (they appear with the container/driver load seconds later);
+it fails the control-device open once ("Error opening RFKILL control
+device"), never retries, and enumerates ZERO rfkill killswitches for the
+whole boot — so the Lomiri indicator flight-mode/Wi-Fi toggles (which call
+org.freedesktop.URfkill FlightMode) had nothing to act on and no-opped.
+The Settings airplane toggle worked because it is NM/rfkill-backed, not
+urfkill-backed. Evidence chain: boot journal error line; post-boot
+EnumerateDevices = only two ofono WWAN devices; after a manual urfkilld
+restart (devices present) = 6 devices incl. rfkill 0/1/2/17 and the
+indicator code path (UrfkillFlightModeToggle -> org.freedesktop.URfkill
+interface, polkit allow_active=yes) verified end-to-end.
+
+FIX: `overlay-debug/system/etc/systemd/system/urfkill.service.d/
+rfkill-wait.conf` — After=dev-rfkill.device + bounded ExecStartPre wait
+(<=20 s) for /dev/rfkill + first rfkill switch. VALIDATED on the
+2026-11-25 21:53 reboot: no open error, "adding killswitch" lines at
+boot, EnumerateDevices = 6, no state re-block (saved-states clean),
+Wi-Fi auto-connects, user-confirmed indicator airplane toggle works.
+
+Operational notes: urfkilld persists per-type soft states in
+/var/lib/urfkill/saved-states and re-applies them on start (a mid-session
+restart with stale "blocked" state will re-block Wi-Fi — check
+saved-states first). The shipped org.freedesktop.URfkill dbus policy
+allows only the plain org.freedesktop.URfkill interface — that is the
+interface the indicator actually uses (the Killswitches-named interface
+does not exist on urfkill 0.6.0); no dbus policy change is needed.
+
+**Hotspot (defect #8 family) — re-tested via the indicator's own API on
+the current image: WORKS.** Driving com.lomiri.connectivity1 Private
+SetHotspot{ Ssid,Auth,Password,Enabled} exactly as the Settings UI does:
+wlan1 came up as AP "HuskyTest" in ~5 s and tore down cleanly on disable.
+The 2026-11-20 "creation took too long" failure does not reproduce on
+this build. mechanicd wifi_change_fw_path returns -1 (Critical log) but
+is non-fatal — brcmfmac needs no firmware switch; the indicator proceeds
+and finds wlan1 immediately. RESIDUAL GAP (upstream indicator code, not
+husky-specific): after hotspot-off, Wi-Fi does NOT auto-reconnect — the
+indicator's setDisconnectWifi(false) only re-enables autoconnect, while
+its earlier user-requested deactivate blocks NM autoconnect; an explicit
+ActivateConnection (or manual reconnect) is needed. Recorded as an
+upstream lomiri-indicator-network issue; not fixed here.
