@@ -1249,3 +1249,52 @@ indicator's setDisconnectWifi(false) only re-enables autoconnect, while
 its earlier user-requested deactivate blocks NM autoconnect; an explicit
 ActivateConnection (or manual reconnect) is needed. Recorded as an
 upstream lomiri-indicator-network issue; not fixed here.
+
+## 2026-11-26 — Ubuntu Plus visual modernization integrated (Phases 2–7)
+
+The approved Ubuntu Plus theme work (spec: user's "Husky Ubuntu Plus Lomiri
+Modernization Plan", evidence husky-verify/ubuntu-plus/) is integrated into
+`overlay/` (ships in normal AND debug images). All files are full-file
+replacements of stock UT QML; every change was prototyped live on-device via
+the reversible loop (backup -> rw window -> session restart -> user visual
+review) and approved phase by phase. Device-side originals + SHA256SUMS:
+/userdata/theme-backup/.
+
+Integrated files (13):
+- Themes/Ambiance/1.3/AmbianceNormal.qml — light tokens: warm ground #FAF9F7,
+  aubergine-charcoal text #2C252B, orange accent family (#E95420 graphics /
+  #C7430F text+focus), orange selection wash.
+- Themes/SuruDark/1.3/SuruDarkNormal.qml — dark tokens (user runs dark mode;
+  plan's "do not edit SuruDark" superseded by user decision 2026-11-26):
+  near-black warm ground #0D0B0C, field #080707, surfaces #1F1C1D, warm
+  off-white text #F4F1EE, orange accent (brand orange graphics, #F4743B
+  small accent text), all WCAG-checked (see PROPOSED-TOKEN-DIFF-DARK.md).
+- Themes/Ambiance/1.3/PageHeaderStyle.qml — title/subtitle Font.Light ->
+  Font.Normal (typography hierarchy).
+- Themes/Ambiance/1.3/TextAreaStyle.qml + FocusShape.qml — field/focus-ring
+  radius gu(1.7) -> gu(1.2) (~10 px, spec radius hierarchy).
+- Themes/Ambiance/1.3/SwitchStyle.qml — checked switch positive(green) ->
+  activity(orange) per user decision.
+- Launcher/LauncherPanel.qml, Launcher/Drawer.qml,
+  Launcher/LauncherDelegate.qml — hardcoded shell surfaces warmed to the
+  theme family (#F2FAF9F7 / #F20D0B0C panel+quicklist+shortcut-hint,
+  #CAFAF9F7 / #BF0D0B0C drawer, tooltip -> #1F1C1D); notification count
+  badge positive -> activity(orange). Home button already LomiriColors.orange
+  by default (no change).
+- Panel/Panel.qml, Panel/PanelMenu.qml — top bar + indicator menu surface
+  #FFFFFF/#000000 -> #FAF9F7/#0D0B0C.
+- Notifications/Notification.qml — card radius "small" -> units.gu(1.5)
+  (~12 px cards; numeric radius accepted by LomiriShape, journal-clean).
+- Greeter/ButtonPrompt.qml — passcode pill #7A111111 -> #7A0D0B0C,
+  radius gu(0.5) -> gu(1). No auth behavior touched.
+
+Untouched by design: icon sizes/labels/touch targets, gestures, indicator
+behavior, PAM/passcode policy, positive/negative semantics, all structural
+QML. Wallpapers NOT included — final artwork to be supplied by an external
+artist (spec Phase 8 deferred); local prototype candidates remain in
+husky-verify/ubuntu-plus/phase8/ (original generative art, 3 renderer
+generations, sources included).
+
+Known cosmetic notes: pre-existing stock QML startup noise unchanged
+(Panel.qml:451, ImageResolver.qml:51, OrientedShell.qml:309, greeter
+null-model TypeErrors) — all verified present on the 2026-11-25 stock boot.
