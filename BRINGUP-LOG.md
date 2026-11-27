@@ -1440,3 +1440,18 @@ stock pages unchanged. Zero QML errors; user-approved on device.
 - Deployed clean (no LandingPage errors); user-approved direction "all of it".
 - Docs: icons-migration/DARK-ACTIVATION-PROPOSAL.md (recommendation: keep
   Dark packaged/inactive), ubuntu-plus/NEXT-SURFACES-PROPOSAL.md (scoping).
+
+## 2026-11-28 (eve) — v4.1 batch: lock screen, notification pills, Wi-Fi hero
+
+Final feasible v4.1 surfaces, one batch (user-directed "all at once"):
+- Greeter (mockup 01): hero clock gu(7.5)->gu(10.5), date "dddd, d MMMM";
+  "Swipe up to unlock" + handle bar (error-message path and fade animation
+  preserved). Rebased onto live files (warm-white #F4F1EE drift from an
+  earlier phase caught by pre-deploy cmp check).
+- Notifications (mockup 07): action buttons -> full pills, readable weight.
+- Wi-Fi settings (mockup 13): display-only hero status card (chip + on/off
+  status word); no duplicate toggle, no faked SSID. Installed wifi page
+  diffed vs upstream first (174-line installed variant, NOT master).
+- Lock-screen weather/media widgets intentionally omitted (no such greeter
+  widgets exist on UT — no placeholders).
+Backups: /userdata/batch-final-backup/. Zero QML errors; user-approved.
