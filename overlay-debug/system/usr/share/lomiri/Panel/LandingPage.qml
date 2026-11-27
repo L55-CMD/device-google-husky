@@ -97,11 +97,6 @@ Item {
         objectPath: "/org/ayatana/indicator/sound"
         property var silent: action("silent-mode")
         property var volume: action("volume")
-        // Stock media player section (present only while the player runs)
-        property var player: action("lomiri-mediaplayer-app.desktop")
-        property var playerPlay: action("play.lomiri-mediaplayer-app.desktop")
-        property var playerNext: action("next.lomiri-mediaplayer-app.desktop")
-        property var playerPrev: action("previous.lomiri-mediaplayer-app.desktop")
         Component.onCompleted: start()
     }
 
@@ -140,12 +135,54 @@ Item {
                                             soundGroup.volume !== undefined &&
                                             soundGroup.volume.state !== undefined
 
-    // Stock media player live state dict ({running, state, title, artist...})
-    // or null when no player section exists (card hidden — no placeholder).
-    readonly property var playerState: (soundGroup.player &&
-                                        soundGroup.player.state !== undefined &&
-                                        soundGroup.player.state !== null)
-                                       ? soundGroup.player.state : null
+    // Now-playing: QDBusActionGroup cannot enumerate actions, so known
+    // player ids are probed (first with running=true wins). Unknown players
+    // stay hidden until added here — honest absence, no placeholder.
+    // Note: click app ids embed versions; update on app upgrades.
+    property var _playerIds: ["lomiri-mediaplayer-app.desktop",
+                              "music.ubports_music_3.3.0.desktop",
+                              "music.ubports_music.desktop"]
+    property var _playerActionCache: ({})
+    property string activePlayerId: ""
+    property var playerState: null
+
+    function _playerAction(id) {
+        if (!_playerActionCache[id]) {
+            _playerActionCache[id] = soundGroup.action(id);
+        }
+        return _playerActionCache[id];
+    }
+
+    function refreshPlayer() {
+        for (var i = 0; i < _playerIds.length; i++) {
+            var a = _playerAction(_playerIds[i]);
+            if (a && a.state !== undefined && a.state !== null &&
+                a.state.running === true) {
+                activePlayerId = _playerIds[i];
+                playerState = a.state;
+                return;
+            }
+        }
+        activePlayerId = "";
+        playerState = null;
+    }
+
+    Timer {
+        interval: 2000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.refreshPlayer()
+    }
+
+    function playerControl(verb) {
+        if (activePlayerId !== "") {
+            var a = _playerAction(verb + "." + activePlayerId);
+            if (a) {
+                a.activate();
+            }
+        }
+    }
 
     function onOff(state) {
         return state === true ? i18n.tr("On") : i18n.tr("Off");
@@ -293,6 +330,16 @@ Item {
                     stateText: root.onOff(networkGroup.hotspot ? networkGroup.hotspot.state : undefined)
                     onPageRequested: root.submenuRequested(desc.network)
                 }
+
+                LandingTile {
+                    action: networkGroup.airplane
+                    accent: "#8A93A6"
+                    iconName: "airplane-mode-disabled"
+                    iconNameActive: "airplane-mode"
+                    label: i18n.tr("Flight Mode")
+                    stateText: root.onOff(networkGroup.airplane ? networkGroup.airplane.state : undefined)
+                    onPageRequested: root.submenuRequested(desc.network)
+                }
             }
 
             // ----- brightness -----
@@ -354,7 +401,7 @@ Item {
             // ----- now playing (only while the stock player runs) -----
             Rectangle {
                 id: mediaCard
-                visible: root.playerState !== null && root.playerState.running === true
+                visible: root.playerState !== null
                 width: parent.width
                 height: visible ? mediaColumn.height + units.gu(3) : 0
                 radius: units.gu(1.5)
@@ -402,9 +449,7 @@ Item {
                             color: theme.palette.normal.backgroundText
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: {
-                                    if (soundGroup.playerPrev) soundGroup.playerPrev.activate();
-                                }
+                                onClicked: root.playerControl("previous")
                             }
                         }
 
@@ -416,9 +461,7 @@ Item {
                             color: "#E86A8A"
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: {
-                                    if (soundGroup.playerPlay) soundGroup.playerPlay.activate();
-                                }
+                                onClicked: root.playerControl("play")
                             }
                         }
 
@@ -429,9 +472,7 @@ Item {
                             color: theme.palette.normal.backgroundText
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: {
-                                    if (soundGroup.playerNext) soundGroup.playerNext.activate();
-                                }
+                                onClicked: root.playerControl("next")
                             }
                         }
                     }

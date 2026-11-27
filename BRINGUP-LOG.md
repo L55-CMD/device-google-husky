@@ -1427,3 +1427,16 @@ Hub pages restyled to the v4.1 submenu language: per-row cards with coloured
 icon chips + subtitles; live status value only where a truthful backend
 exists (Hotspot On/Off via the network indicator action). Navigation and
 stock pages unchanged. Zero QML errors; user-approved on device.
+
+### Quick Controls extras (same session): flight-mode tile + multi-player probe
+
+- 8th tile: Flight Mode (slate accent, airplane-mode icons, network submenu
+  on long-press) — grid now 2 full rows.
+- Now-playing card generalized: QDBusActionGroup cannot enumerate actions,
+  so known player ids are probed on a 2s timer (mediaplayer + music app ids);
+  first running player wins; unknown players honestly hidden. Transport
+  actions resolved per active player. Limitation recorded: click id versions
+  need updating on app upgrades.
+- Deployed clean (no LandingPage errors); user-approved direction "all of it".
+- Docs: icons-migration/DARK-ACTIVATION-PROPOSAL.md (recommendation: keep
+  Dark packaged/inactive), ubuntu-plus/NEXT-SURFACES-PROPOSAL.md (scoping).
