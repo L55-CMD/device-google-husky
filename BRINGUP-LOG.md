@@ -1420,3 +1420,10 @@ Per approved v4.1 mockup 06, replacing the staged v3/v4 prototype:
 - "Silent" tile keeps its honest name (UT silent-mode is not DND).
 - One scoping bug found+fixed on deploy (playerState on wrong object).
   New shell instance clean (only documented stock startup noise).
+
+### Settings hubs v3 (same session): mockup-13 stacked cards
+
+Hub pages restyled to the v4.1 submenu language: per-row cards with coloured
+icon chips + subtitles; live status value only where a truthful backend
+exists (Hotspot On/Off via the network indicator action). Navigation and
+stock pages unchanged. Zero QML errors; user-approved on device.
