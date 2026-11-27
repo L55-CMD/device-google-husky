@@ -1,0 +1,11 @@
+# Ubuntu Plus: keep text assets LF so repo checkouts byte-match deployed files
+*.qml      text eol=lf
+*.svg      text eol=lf
+*.settings text eol=lf
+*.json     text eol=lf
+*.md       text eol=lf
+*.sh       text eol=lf
+*.py       text eol=lf
+*.png      binary
+*.sci      binary
+*.so       binary
