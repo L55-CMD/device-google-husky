@@ -1407,3 +1407,16 @@ Per approved v4.1 mockup 06, replacing the staged v3/v4 prototype:
 - Deployed to /usr/share/lomiri/Panel/ (7 files, device == staged copies),
   zero QML errors on shell restart, user visual pass approved.
   Backups: /userdata/stage4b-backup/ (5 replaced files + SHA256SUMS).
+
+### Stage 4B polish (same session): accent sliders + now-playing card
+
+- AccentSlider.qml: per-instance accent slider (stock Slider colours are
+  theme-style-only); amber brightness / pink volume per mockup 06; honest
+  snap-back on rejected writes.
+- Now-playing card: bound to the sound indicator's media-player action
+  state; visible ONLY while the stock player runs (no placeholder);
+  prev/play-pause/next via the indicator's own actions. Supports the stock
+  media player id; other players hide the card (recorded limitation).
+- "Silent" tile keeps its honest name (UT silent-mode is not DND).
+- One scoping bug found+fixed on deploy (playerState on wrong object).
+  New shell instance clean (only documented stock startup noise).

@@ -97,6 +97,11 @@ Item {
         objectPath: "/org/ayatana/indicator/sound"
         property var silent: action("silent-mode")
         property var volume: action("volume")
+        // Stock media player section (present only while the player runs)
+        property var player: action("lomiri-mediaplayer-app.desktop")
+        property var playerPlay: action("play.lomiri-mediaplayer-app.desktop")
+        property var playerNext: action("next.lomiri-mediaplayer-app.desktop")
+        property var playerPrev: action("previous.lomiri-mediaplayer-app.desktop")
         Component.onCompleted: start()
     }
 
@@ -134,6 +139,13 @@ Item {
     readonly property bool volumeAvailable: soundGroup.volume !== null &&
                                             soundGroup.volume !== undefined &&
                                             soundGroup.volume.state !== undefined
+
+    // Stock media player live state dict ({running, state, title, artist...})
+    // or null when no player section exists (card hidden — no placeholder).
+    readonly property var playerState: (soundGroup.player &&
+                                        soundGroup.player.state !== undefined &&
+                                        soundGroup.player.state !== null)
+                                       ? soundGroup.player.state : null
 
     function onOff(state) {
         return state === true ? i18n.tr("On") : i18n.tr("Off");
@@ -296,25 +308,16 @@ Item {
                     color: theme.palette.normal.backgroundSecondaryText
                 }
 
-                Slider {
+                AccentSlider {
                     id: brightnessSlider
                     width: parent.width
                     minimumValue: 0.01
                     maximumValue: 1.0
+                    accent: "#E8B54B" // mockup 06 amber
                     value: root.brightnessAvailable ? powerGroup.brightness.state : 0.5
-
-                    onValueChanged: {
-                        if (pressed && root.brightnessAvailable) {
-                            powerGroup.brightness.updateState(value);
-                        }
-                    }
-                    // Dragging rewrites `value` (binding destroyed); restore it
-                    // on release so the slider tracks the real backend value.
-                    onPressedChanged: {
-                        if (!pressed) {
-                            value = Qt.binding(function() {
-                                return root.brightnessAvailable ? powerGroup.brightness.state : 0.5;
-                            });
+                    onMoved: {
+                        if (root.brightnessAvailable) {
+                            powerGroup.brightness.updateState(newValue);
                         }
                     }
                 }
@@ -333,23 +336,103 @@ Item {
                     color: theme.palette.normal.backgroundSecondaryText
                 }
 
-                Slider {
+                AccentSlider {
                     id: volumeSlider
                     width: parent.width
                     minimumValue: 0.0
                     maximumValue: 1.0
+                    accent: "#E86A8A" // mockup 06 pink
                     value: root.volumeAvailable ? soundGroup.volume.state : 0.0
-
-                    onValueChanged: {
-                        if (pressed && root.volumeAvailable) {
-                            soundGroup.volume.updateState(value);
+                    onMoved: {
+                        if (root.volumeAvailable) {
+                            soundGroup.volume.updateState(newValue);
                         }
                     }
-                    onPressedChanged: {
-                        if (!pressed) {
-                            value = Qt.binding(function() {
-                                return root.volumeAvailable ? soundGroup.volume.state : 0.0;
-                            });
+                }
+            }
+
+            // ----- now playing (only while the stock player runs) -----
+            Rectangle {
+                id: mediaCard
+                visible: root.playerState !== null && root.playerState.running === true
+                width: parent.width
+                height: visible ? mediaColumn.height + units.gu(3) : 0
+                radius: units.gu(1.5)
+                color: theme.palette.normal.base
+
+                Column {
+                    id: mediaColumn
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        margins: units.gu(1.5)
+                    }
+                    spacing: units.gu(0.3)
+
+                    Label {
+                        width: parent.width
+                        text: (root.playerState && root.playerState.title)
+                              ? root.playerState.title : i18n.tr("Media Player")
+                        fontSize: "medium"
+                        font.weight: Font.DemiBold
+                        color: theme.palette.normal.backgroundText
+                        elide: Text.ElideRight
+                    }
+
+                    Label {
+                        visible: text !== ""
+                        width: parent.width
+                        text: (root.playerState && root.playerState.artist)
+                              ? root.playerState.artist : ""
+                        fontSize: "small"
+                        color: theme.palette.normal.backgroundSecondaryText
+                        elide: Text.ElideRight
+                    }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: units.gu(4)
+                        height: units.gu(4)
+
+                        Icon {
+                            name: "media-skip-backward"
+                            width: units.gu(3); height: units.gu(3)
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: theme.palette.normal.backgroundText
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (soundGroup.playerPrev) soundGroup.playerPrev.activate();
+                                }
+                            }
+                        }
+
+                        Icon {
+                            name: (root.playerState && root.playerState.state === "Playing")
+                                  ? "media-playback-pause" : "media-playback-start"
+                            width: units.gu(3); height: units.gu(3)
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: "#E86A8A"
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (soundGroup.playerPlay) soundGroup.playerPlay.activate();
+                                }
+                            }
+                        }
+
+                        Icon {
+                            name: "media-skip-forward"
+                            width: units.gu(3); height: units.gu(3)
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: theme.palette.normal.backgroundText
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (soundGroup.playerNext) soundGroup.playerNext.activate();
+                                }
+                            }
                         }
                     }
                 }
