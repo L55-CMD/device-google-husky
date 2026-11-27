@@ -1389,3 +1389,21 @@ verified (1b831e29...); 28-concept inventory validated (18 installed /
   mechanism on this image; separate Lane B/D proposal required).
 - User visual pass approved; rootfs returned to ro; no reboot, no CI,
   no flash. Commit prepared in overlay-debug, push held by user.
+
+## 2026-11-28 (pm) — Stage 4B: Quick Controls landing in the pull-down panel
+
+Per approved v4.1 mockup 06, replacing the staged v3/v4 prototype:
+- LandingPage v5: "Controls" header + "Pixel 8 Pro · N% battery" (BatteryMonitor,
+  hidden if unavailable); 7 coloured state tiles (Wi-Fi/BT/Mobile/Rotation/
+  Silent/Location/Hotspot — accent fill + status dot when ON, dark when OFF,
+  live state text incl. "No SIM"); brightness + volume sliders bound to the
+  display/sound indicator actions (restore-binding pattern, no optimistic UI).
+  No Torch tile: no flashlight backend on this image (spec rule).
+- LandingTile: new mockup-06 tile component (tap = toggle, long-press =
+  indicator submenu deep link; state-honest: colour follows action.state only).
+- v4 architecture retained: landing + calendar pager replaces the per-indicator
+  pager in landing mode; indicator pages open as overlay submenu with back row;
+  bar stays collapsed. All tile icons verified present in suru pre-deploy.
+- Deployed to /usr/share/lomiri/Panel/ (7 files, device == staged copies),
+  zero QML errors on shell restart, user visual pass approved.
+  Backups: /userdata/stage4b-backup/ (5 replaced files + SHA256SUMS).
