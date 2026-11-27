@@ -1,0 +1,19 @@
+{
+    "icon": "preferences-desktop-wallpaper-symbolic",
+    "name": "Personalization",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 0,
+    "keywords": [
+        "wallpaper",
+        "background",
+        "appearance",
+        "theme",
+        "launcher",
+        "gestures",
+        "personalization"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "page-component": "PageComponent.qml"
+}

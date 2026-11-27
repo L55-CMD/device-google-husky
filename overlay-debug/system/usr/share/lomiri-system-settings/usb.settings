@@ -1,0 +1,20 @@
+{
+    "plugin": "usb-plugin",
+    "name": "USB",
+    "icon": "stock_usb",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 2,
+    "keywords": [
+        "usb",
+        "adb",
+        "mtp",
+        "rndis",
+        "charging",
+        "tethering"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "visible-if-file-exists": "/etc/dbus-1/system.d/usb_moded.conf",
+    "page-component": "PageComponent.qml"
+}

@@ -1,0 +1,24 @@
+{
+    "icon": "preferences-desktop-locale-symbolic",
+    "name": "Language & Text",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 2,
+    "keywords": [
+        "language",
+        "keyboard",
+        "spellcheck",
+        "automatic",
+        "correct",
+        "suggestions",
+        "capitalization",
+        "punctuation",
+        "layout",
+        "display",
+        "words",
+        "vibration"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "page-component": "PageComponent.qml"
+}

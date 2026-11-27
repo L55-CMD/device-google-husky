@@ -1,0 +1,19 @@
+{
+    "plugin": "brightness-plugin",
+    "icon": "display-brightness-symbolic",
+    "name": "Brightness",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 4,
+    "keywords": [
+        "brightness",
+        "display",
+        "screen",
+        "automatic",
+        "adjust"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": true,
+    "has-dynamic-name": true,
+    "page-component": "PageComponent.qml"
+}

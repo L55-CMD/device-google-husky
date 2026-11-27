@@ -1,0 +1,14 @@
+{
+    "name": "Libertine",
+    "icon": "/usr/share/lomiri-system-settings/icons/libertine-plugin.svg",
+    "translations": "libertine",
+    "category": "hub-internal",
+    "keywords": [
+        "libertine",
+        "legacy",
+        "x11"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "plugin": "libertine-plugin"
+}

@@ -1,0 +1,16 @@
+{
+    "icon": "preferences-system-time-symbolic",
+    "name": "Time and Date",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 3,
+    "keywords": [
+        "time",
+        "date",
+        "timezone",
+        "automatic"
+    ],
+    "page-component": "PageComponent.qml",
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false
+}

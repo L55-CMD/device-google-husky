@@ -1298,3 +1298,94 @@ generations, sources included).
 Known cosmetic notes: pre-existing stock QML startup noise unchanged
 (Panel.qml:451, ImageResolver.qml:51, OrientedShell.qml:309, greeter
 null-model TypeErrors) — all verified present on the 2026-11-25 stock boot.
+
+## 2026-11-26 (pm) — Ubuntu Plus Phase 3-5 on-device results (spec v2)
+
+All user-approved live on device; repo integration STAGED in overlay-debug
+(uncommitted, push held by user); commits 798441b + 2c40a25 still local-only.
+
+- Phase 3 icon pilot: 62 original parametric SVGs (generate-icons.py),
+  deployed to /usr/share/icons/suru/{status,actions,apps}; 5 stock-symlink
+  names replaced with real files after restoring clobbered targets from the
+  system_a backup image (see overlay-debug .../suru/SYMLINK-NOTE.md).
+  Icon cache rebuilt; zero missing-icon errors.
+- Phase 4 Stage A: PanelItemRow selected-tab underline -> palette activity
+  (orange); IndicatorItem unselected tab labels -> backgroundTertiaryText.
+  Cutout spacing audited: no Lane-A knob exists (emergent layout) — skipped.
+- Phase 5: mouse/printing .settings entries removed (user-approved; the
+  form-factors filter is unimplemented in lomiri-system-settings 1.3.2);
+  about page gained read-only Kernel + Build rows via the existing
+  StorageAbout plugin API (no new backend, redaction reviewed).
+- Operational lesson (IMPORTANT for future image/edit work): never use
+  sysrq-u as a remount fallback — sda34 carries a permanent orphan inode
+  (deleted zram_swap held by loop36), so forcing /userdata ro makes it
+  un-remountable rw until reboot. When the icon cache was replaced, restart
+  the session FIRST (releases the deleted cache), then remount ro normally.
+  Two user-approved reboots occurred; phone healthy after each.
+- Evidence: husky-verify/ubuntu-plus/{phase3-icons,phase4-panel,
+  phase5-settings}/ + VALIDATION-20261126.md.
+
+## 2026-11-26 (eve) — User asset pack integrated on-device; overlay-debug refreshed
+
+User supplied their own "Ubuntu Plus Project Icons" pack (v0.4) + 12
+wallpapers, superseding the generated pilot icon set. Applied on device:
+- 81 shell/status/settings icons baked from the pack (currentColor->on-dark
+  foreground; battery level variants baked into the pack outline incl.
+  charging; cellular bar-count levels; wifi secure = padlock composite;
+  battery family scaled 1.18x after user size feedback).
+- 18 app icons mapped via installed .desktop Icon= paths (click apps +
+  core system apps; third-party clicks untouched).
+- Dark keyboard: maliit SuruDark.json retuned to the warm dark family +
+  gsettings theme switch (user-approved "great"); light Ambiance keyboard
+  also retuned and retained.
+- Stage fixes: WorkspacePreview selected border blue->orange;
+  FakeMaximizeDelegate/ResizeGrip warmed.
+- 12 pack wallpapers on device (Pictures/Wallpapers/Ubuntu Plus).
+overlay-debug refreshed to match (108 files: pack icons, app icons,
+keyboard themes, Stage/Panel/settings QML). validate-overlay.sh PASS.
+NOT committed; push still held by user. Build-time packaging notes:
+overlay-debug/system/usr/share/icons/suru/SYMLINK-NOTE.md.
+
+## 2026-11-27/28 — Stage 5: Settings modernization (spec §9, Gates 1-2 approved)
+
+Full IA rework of lomiri-system-settings 1.3.2, QML/manifest-only:
+- Custom landing (qml-plugins/landing/EntryComponent.qml, uncategorized-top
+  entry): grouped card sections with live values (Wi-Fi/BT on-off, volume %,
+  battery % via upower, brightness %, cellular state), in-place search
+  filtering via pluginManager.filter, navigation via shell loadPluginByName.
+- 3 submenu hubs (More connections / Personalization / System & updates +
+  Danger zone) pushing STOCK pages unchanged via pluginManager.getByName().
+- 23 stock manifests demoted to unrendered "hub-internal" category (loaded,
+  deep-linkable, invisible on landing); renames: About phone, Sound & haptics.
+- Key architecture facts recorded in husky-verify/ubuntu-plus/phase5b-settings/:
+  landing grid is qrc-compiled (5 fixed sections), rich entry-components and
+  hub pages are the supported extension points; hide-by-default would break
+  deep links (do not use).
+- Backups: /userdata/settings-backup/phase5b/ (26 originals + SHA256SUMS).
+- User-approved on device; app-restart iteration only, no session restart.
+
+## 2026-11-28 — Unified Icon Concept 1.0.0: Phases 0-4 (pilot + Light rollout)
+
+Migration per "Ubuntu Plus Unified Icon UI Migration Plan" + readiness pack
+(evidence: husky-verify/ubuntu-plus/icons-migration/). Source ZIP hash
+verified (1b831e29...); 28-concept inventory validated (18 installed /
+10 not-installed / third-party retained); fail-closed validator PASS.
+
+- Phase 2: 40 deterministic exports (Qt SVG renderer; 512 masters +
+  128px PNG targets for calendar/media-player), five Light+Dark
+  before/after proofs approved by user (Gate M2).
+- Phase 3 pilot (calculator/clock/notes): deployed byte-identical to
+  approved exports; rollback proven (hashes restored exactly).
+  KEY OPERATIONAL LESSONS: (1) app-icon reload requires killing the
+  thumbnailer daemon AND restarting lomiri-full-greeter — shell restart
+  alone serves stale pixmaps; (2) NEVER strace the live compositor —
+  it wedges the display pipeline (recovered via clean shell restart,
+  no reboot needed).
+- Phase 4 Stage A: all 18 installed project apps now carry the Unified
+  Light family (16 SVG + 2 PNG at 128x128, owners/modes preserved,
+  sha256-verified vs export manifest). Third-party branding untouched.
+  Originals (v0.4) in /userdata/icon-stageA-backup/ + git history.
+- Phase 5: Dark family PREPARED — NOT ACTIVE (no supported selection
+  mechanism on this image; separate Lane B/D proposal required).
+- User visual pass approved; rootfs returned to ro; no reboot, no CI,
+  no flash. Commit prepared in overlay-debug, push held by user.

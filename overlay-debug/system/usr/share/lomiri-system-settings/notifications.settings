@@ -1,0 +1,24 @@
+{
+    "icon": "preferences-desktop-notifications-symbolic",
+    "name": "Notifications",
+    "plugin": "notifications-plugin",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 5,
+    "keywords": [
+        "software",
+        "notifications",
+        "apps",
+        "authorize",
+        "alerts",
+        "permissions",
+        "badges",
+        "facebook",
+        "twitter",
+        "flickr",
+        "gmail"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": true,
+    "page-component": "PageComponent.qml"
+}

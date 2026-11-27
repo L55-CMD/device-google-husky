@@ -1,0 +1,23 @@
+{
+    "name": "Accounts",
+    "icon": "preferences-desktop-accounts-symbolic",
+    "translations": "lomiri-system-settings-online-accounts",
+    "category": "hub-internal",
+    "priority": 3,
+    "keywords": [
+        "accounts",
+        "online",
+        "login",
+        "services",
+        "social",
+        "feeds",
+        "access",
+        "authorize",
+        "revoke",
+        "web"
+    ],
+    "has-dynamic-keywords": true,
+    "has-dynamic-visibility": false,
+    "plugin": "online-accounts",
+    "page-component": "MainPage.qml"
+}

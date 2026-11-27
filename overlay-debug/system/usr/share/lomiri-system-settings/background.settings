@@ -1,0 +1,21 @@
+{
+    "icon": "preferences-desktop-wallpaper-symbolic",
+    "translations": "lomiri-system-settings",
+    "name": "Background & Appearance",
+    "category": "hub-internal",
+    "priority": 0,
+    "keywords": [
+        "appearance",
+        "background",
+        "wallpaper",
+        "art",
+        "photo",
+        "picture",
+        "image",
+        "theme",
+        "dark"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "page-component": "MainPage.qml"
+}

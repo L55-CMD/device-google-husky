@@ -1,0 +1,31 @@
+{
+    "icon": "info",
+    "name": "About phone",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 0,
+    "keywords": [
+        "about",
+        "system",
+        "device",
+        "info",
+        "phone",
+        "number",
+        "imei",
+        "serial",
+        "address",
+        "mac",
+        "licenses",
+        "developer",
+        "software",
+        "storage",
+        "disk",
+        "space",
+        "version",
+        "revision"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "entry-component": "EntryComponent.qml",
+    "page-component": "PageComponent.qml"
+}

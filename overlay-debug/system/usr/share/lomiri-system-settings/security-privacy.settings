@@ -1,0 +1,23 @@
+{
+    "icon": "preferences-system-privacy-symbolic",
+    "name": "Security & Privacy",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 4,
+    "keywords": [
+        "security",
+        "privacy",
+        "lock",
+        "sim",
+        "pin",
+        "code",
+        "password",
+        "passphrase",
+        "swipe",
+        "allow",
+        "access"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "page-component": "PageComponent.qml"
+}

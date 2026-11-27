@@ -1,0 +1,31 @@
+{
+    "plugin": "cellular-plugin",
+    "icon": "gsm-3g-high",
+    "name": "Cellular",
+    "translations": "lomiri-system-settings-cellular",
+    "category": "hub-internal",
+    "priority": 1,
+    "form-factors": [
+        "phone"
+    ],
+    "keywords": [
+        "cellular",
+        "network",
+        "mobile",
+        "gsm",
+        "data",
+        "carrier",
+        "5g",
+        "4g",
+        "3g",
+        "2g",
+        "lte",
+        "nr",
+        "apn",
+        "roam",
+        "sim"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": true,
+    "page-component": "PageComponent.qml"
+}

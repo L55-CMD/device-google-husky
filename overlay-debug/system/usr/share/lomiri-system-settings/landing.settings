@@ -1,0 +1,15 @@
+{
+    "icon": "settings",
+    "name": "Settings",
+    "translations": "lomiri-system-settings",
+    "category": "uncategorized-top",
+    "priority": 10,
+    "keywords": [
+        "settings",
+        "options",
+        "preferences"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "entry-component": "EntryComponent.qml"
+}

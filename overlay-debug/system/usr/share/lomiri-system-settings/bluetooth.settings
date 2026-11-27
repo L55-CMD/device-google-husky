@@ -1,0 +1,23 @@
+{
+    "icon": "bluetooth-active",
+    "name": "Bluetooth",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 2,
+    "keywords": [
+        "bluetooth",
+        "headset",
+        "pair",
+        "device",
+        "discover",
+        "car",
+        "handsfree",
+        "wireless",
+        "connect",
+        "disconnect",
+        "stereo"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "page-component": "PageComponent.qml"
+}

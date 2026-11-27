@@ -1,0 +1,19 @@
+{
+    "icon": "preferences-system-updates-symbolic",
+    "name": "System & updates",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 0,
+    "keywords": [
+        "updates",
+        "system",
+        "usb",
+        "phone",
+        "libertine",
+        "reset",
+        "factory"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "page-component": "PageComponent.qml"
+}

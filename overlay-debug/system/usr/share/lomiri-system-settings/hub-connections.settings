@@ -1,0 +1,17 @@
+{
+    "icon": "preferences-network-hotspot-symbolic",
+    "name": "More connections",
+    "translations": "lomiri-system-settings",
+    "category": "hub-internal",
+    "priority": 0,
+    "keywords": [
+        "hotspot",
+        "tethering",
+        "vpn",
+        "nfc",
+        "connections"
+    ],
+    "has-dynamic-keywords": false,
+    "has-dynamic-visibility": false,
+    "page-component": "PageComponent.qml"
+}
